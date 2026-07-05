@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd469"/>
+      <stop offset="0.55" stop-color="#f0a500"/>
+      <stop offset="1" stop-color="#c8860a"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="30" height="30" rx="7" fill="#0d1117" stroke="#2a3446" stroke-width="1"/>
+  <g fill="url(#g)">
+    <!-- pediment -->
+    <path d="M16 4.5 L27.5 13 L4.5 13 Z"/>
+    <!-- architrave -->
+    <rect x="5" y="13.6" width="22" height="2"/>
+    <!-- columns -->
+    <rect x="6.4" y="16" width="1.9" height="8" rx="0.3"/>
+    <rect x="10.5" y="16" width="1.9" height="8" rx="0.3"/>
+    <rect x="15.05" y="16" width="1.9" height="8" rx="0.3"/>
+    <rect x="19.6" y="16" width="1.9" height="8" rx="0.3"/>
+    <rect x="23.7" y="16" width="1.9" height="8" rx="0.3"/>
+    <!-- steps -->
+    <rect x="5" y="24.2" width="22" height="1.8"/>
+    <rect x="3.2" y="26.4" width="25.6" height="2.2" rx="0.4"/>
+  </g>
+</svg>
