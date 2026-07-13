@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "gen:feeds": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/gen-feeds.mjs",
+    "predev": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/gen-feeds.mjs",
     "dev": "node scripts/localhost-dev.mjs",
     "dev:default": "next dev -p 3000",
+    "prebuild": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/gen-feeds.mjs",
     "build": "next build",
     "start": "next start -p 3000",
     "lint": "next lint"

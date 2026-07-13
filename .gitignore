@@ -50,3 +50,8 @@ playwright-report/
 
 # Unprocessed source images (dropped in for processing)
 /incoming/
+
+# Generated machine-readable feeds (built from data/ by scripts/gen-feeds.mjs
+# on predev/prebuild — a pure function of the registry, so not committed)
+/public/feed.json
+/public/feed.rss
