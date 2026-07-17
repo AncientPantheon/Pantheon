@@ -10,7 +10,10 @@ site is **instantly recognizable as one family**: identical shape, layout, heade
 > skeleton, different skin.
 
 Reference implementation: **Pythia** (`constructors/Pythia/apps/pythia/public/{admin.html,admin.js,styles.css}`)
-— the clean vanilla reference for the header + sidebar admin. Cited concretely where relevant.
+— the clean vanilla reference for the header + sidebar admin, **live at
+`pythia.ancientholdings.eu/admin`**. Key anchors: the `.admin-header` + `renderAuthbox()` identity
+block (§3); the `.admin-layout` sidebar+pane, `renderSidebar()` + `routeFromHash()` (§4); the
+`.role-badge` / `--accent` alias (§2, §5). Cited concretely per section below.
 
 ---
 

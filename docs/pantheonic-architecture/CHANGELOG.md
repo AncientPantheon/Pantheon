@@ -21,6 +21,8 @@ Pantheon website repo — the central authority every site follows).
   pane admin architecture (unselected `/admin` prompt → `/admin#section` detail, nested routing,
   responsive collapse). Includes a conformance checklist.
 
-**Pending (next):**
-- Pythia's admin rebuilt as the reference implementation of `design/` v1.0 (sidebar + pane +
-  standardized header), which the guideline then cites concretely.
+**Reference implementation landed:**
+- Pythia's admin rebuilt to `design/` v1.0 — standardized Pantheonic Header + sidebar/content-pane
+  master-detail (unselected `/admin` prompt → `/admin#section` detail, nested routing), role badges,
+  `--accent` token — and **deployed live** (`pythia.ancientholdings.eu/admin`) via Pythia's own
+  blue-green Deploy pipeline. The guideline now cites it. Pythia is the working template for `design/`.
