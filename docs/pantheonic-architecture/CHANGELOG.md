@@ -2,6 +2,28 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-07-17 — `design/` v1.1 — 3-level header + the single-screen landing stage
+
+The header and landing shape settled through live iteration on Pythia and are now law.
+
+- **`design/PANTHEONIC-DESIGN-ARCHITECTURE.md` → v1.1.** Rewrote §3 (the Header) into the definitive
+  **three-level** header — L1 medallion + one shared identity block, L2 Tier-1 sections + a single
+  memorable action, L3 a **fixed-height** Tier-2 zone that never resizes the header — with a
+  **full-chrome-width separator** (on `.ph`, not `.ph-inner`) and strong squared `.ph-btn` buttons.
+  Ruled that **Tier-2 nav lives only in the header, never duplicated in the content panel**.
+- **New §4 — The Landing Stage.** A hero-portrait landing is a **fixed-size page (PDF-style)**: fixed
+  header + footer, one `.landing-mid` scroll region, a `--stage-h` stage that neither grows nor
+  collapses, a **fixed-box portrait** (native aspect, no `object-fit` letterbox) as the size etalon
+  with a collapse toggle, and a work-area that fills to the portrait height and scrolls only on
+  overflow.
+- **§1 — sanctioned width exception `--landing-maxw`** for hero-portrait landings (applied to the
+  landing `.shell` + header inner + footer inner alike); `--maxw: 1536px` still governs everything else.
+- **§5 — the `[hidden]`-wins rule**: any `hidden`-toggled element needs its own `[hidden]{display:none}`
+  guard when a `display:` rule would beat it (the class of bug behind the admin-gate ghost and the
+  duplicated landing sub-nav).
+- Pythia (`apps/pythia/public/{index.html,app.js,styles.css}`) is the live reference for all of the
+  above, deployed at `pythia.ancientholdings.eu`.
+
 ## 2026-07-17 — Library established
 
 Centralized the scattered Pantheon-wide standards into this one authority (folder created in the

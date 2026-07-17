@@ -1,6 +1,6 @@
 # Pantheonic Design Architecture
 
-**Version 1.0 — 2026-07-17.** The UI/UX law for every AncientPantheon surface (the Pantheon website,
+**Version 1.1 — 2026-07-17.** The UI/UX law for every AncientPantheon surface (the Pantheon website,
 constructor-services like Pythia, automatons like Mnemosyne/Caduceus/Aletheia). Follow it so every
 site is **instantly recognizable as one family**: identical shape, layout, header, and identity flow —
 **only the colour theme differs.** This is a living document; record changes in `../CHANGELOG.md`.
@@ -9,11 +9,12 @@ site is **instantly recognizable as one family**: identical shape, layout, heade
 > literal colours. A site keeps the token **names + roles** and swaps only the **values**. Same
 > skeleton, different skin.
 
-Reference implementation: **Pythia** (`constructors/Pythia/apps/pythia/public/{admin.html,admin.js,styles.css}`)
-— the clean vanilla reference for the header + sidebar admin, **live at
-`pythia.ancientholdings.eu/admin`**. Key anchors: the `.admin-header` + `renderAuthbox()` identity
-block (§3); the `.admin-layout` sidebar+pane, `renderSidebar()` + `routeFromHash()` (§4); the
-`.role-badge` / `--accent` alias (§2, §5). Cited concretely per section below.
+Reference implementation: **Pythia** (`constructors/Pythia/apps/pythia/public/{index.html,app.js,admin.html,admin.js,styles.css}`)
+— the clean vanilla reference for the 3-level header (§3), the single-screen landing stage (§4), and
+the sidebar admin (§5), **live at `pythia.ancientholdings.eu`**. Key anchors: the `.ph` header +
+`renderIdentity()` (shared `pantheon-header.js`) for the identity block (§3); the `.landing-mid` /
+`.stage` / `.work-area` fixed page + `renderTier2()` header-owned sub-nav (§4); the `.admin-layout`
+sidebar+pane + `routeFromHash()` (§5); the `.role-badge` / `--accent` alias (§2, §6).
 
 ---
 
@@ -30,6 +31,13 @@ anti-pattern this fixes).
 
 Everything — header, hero, admin — lays out inside a `.shell` (or equivalent) capped at `--maxw`.
 Full-bleed backgrounds (starfield, gradients) may span the viewport, but *content* stops at `--maxw`.
+
+> **Sanctioned exception — the hero-portrait landing.** A landing built around a full-height hero
+> portrait (§4) may widen to a second constant, **`--landing-maxw`** (Pythia: `1760px`), so the
+> content column beside the portrait stays usable on wide screens. When a site takes the exception it
+> applies `--landing-maxw` to the landing `.shell`, its header inner, AND its footer inner so all
+> three left-edges align. `--maxw` still governs every other surface (admin, sub-pages). This is the
+> *only* width a site may add, and only for this case.
 
 ---
 
@@ -64,130 +72,205 @@ per-site beyond the token values.
 
 ---
 
-## 3. The Pantheonic Header
+## 3. The Pantheonic Header — three fixed levels
 
 One standardized header on **every** surface (public + admin), because AncientHub login appears
-everywhere. It has **fixed control slots**; a surface fills the slots it needs and omits the rest —
-it never rearranges them. Left is navigation/identity-of-place; right is identity-of-person.
+everywhere. It is a **sticky, full-width bar** with a **full-chrome-width bottom separator** and up to
+**three levels** of a fixed height. A surface fills the levels it needs; the header's height never
+changes as content within a level appears or disappears.
 
 ```
-┌───────────────────────────────────────────────────────────────────────────────┐
-│ [◄ back]  BRAND vX.Y.Z   · · · nav · · ·        Signed in as <name> · <role>  ▸  │
-│                                                 [Admin] [Log out] [site-action]  │
-└───────────────────────────────────────────────────────────────────────────────┘
+┌─ .ph (full width, sticky, border-bottom spans the whole chrome) ─────────────────────┐
+│ .ph-inner (capped at --maxw / --landing-maxw, centred) :                              │
+│  L1  ◆ Brand vX.Y.Z            [◄ back]        Signed in as <name> · <role>            │
+│                                                [Login] · [Admin] · [Log out]           │
+│  L2  [ Section ][ Section ][ Section ]                        [ Memorable action ↗ ]   │
+│  L3  [ sub-view ][ sub-view ]                                 [ (reserved) ]           │
+└───────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Left cluster (in order):**
-1. **Back control** — always the leftmost element when a back action exists (`◄ <Where>`, e.g.
-   `◄ Pythia` from admin → home). Styled as a ghost button. Never place "back" on the right.
-2. **Brand + version** — the wordmark, then a small mono version chip immediately right of it
-   (`vX.Y.Z`, bordered, `--ink-mute`). The version is the running app version.
-3. **Primary nav** (public surfaces) — inline section links; a trailing right-aligned link (e.g.
-   `Documentation →`) may push to the far right of the nav row.
+### 3.1 The separator is full-width
+The `border-bottom` lives on **`.ph`** (spans the whole viewport width), NOT on the width-capped
+`.ph-inner`. A separator that stops at the content width is the anti-pattern this fixes.
 
-**Right cluster — the identity block (the part to get consistent):** a single component that reads
-`GET /api/me` and renders one of two states:
-- **Signed out:** a `Login with AncientHub` button.
-- **Signed in:** `Signed in as <b>{name}</b> · <RoleBadge role>` followed by, in order:
-  - **Admin / Dashboard** link — a real `<a href="/admin">` **only if** `roles` includes `ancient`;
-    otherwise a **disabled greyed chip** with `aria-disabled="true"` + `title="Requires the ancient role"`.
-  - **Log out** → `/admin/logout`.
-  - **Optional site action** (e.g. `Launch Codex`) — the accent-filled primary button, rightmost.
+### 3.2 Level 1 — identity of place + identity of person
+- **Left:** a **medallion** — the brand wordmark (`.ph-name`, links home) with a small mono version
+  chip immediately right of it (`vX.Y.Z`, bordered, `--ink-mute`; links to the version notes). When a
+  back action exists (admin → home) a **ghost back button** sits immediately right of the medallion —
+  never on the right side.
+- **Right — the identity block (the part to get consistent):** ONE shared implementation
+  (`renderIdentity()` in a shared `pantheon-header.js`), used on public + admin, reading `GET /api/me`:
+  - **Signed out:** a `Login with AncientHub` button.
+  - **Signed in:** `Signed in as <b>{name}</b> · <RoleBadge>` then, in order: **Admin / Dashboard**
+    (a real `<a href="/admin">` only if `roles` includes `ancient`; else a disabled greyed chip with
+    `aria-disabled="true"` + a "requires the ancient role" title) → **Log out**.
+  - Render name/role via `textContent`, never `innerHTML` (the hub-supplied strings must not inject
+    markup). Render nothing until the first `/api/me` resolves (no wrong-state flash).
 
-**Rules:**
-- The identity block is **one implementation** per site (a shared partial/component), used on both
-  the public and admin headers — not coded twice (Mnemosyne's duplication is the anti-pattern).
-- Render identity via `textContent`, never `innerHTML` — the hub-supplied name/role must not be able
-  to inject markup.
-- The block renders nothing until the first `/api/me` resolves (no wrong-state flash).
-- **Admin variant:** same header, but the left cluster is `◄ back` + the **page/section title**
-  (breadcrumb-style) instead of the public nav, and the right identity block omits the Admin link
-  (you're already in admin). Everything else is identical.
+### 3.3 Level 2 — Tier-1 sections + one memorable action
+- **Left:** the site's **Tier-1 section buttons** (Pythia: Chains / Activity / For developers /
+  Connectors) as **strong squared buttons** (`.ph-btn` — 8px radius, deliberately bolder than a pill).
+- **Right:** exactly **one memorable action** — the single accent-worthy link for the surface
+  (Pythia: `Client SDK ↗`). One, not a row.
 
-Reference: Pythia `apps/pythia/public/admin.html` header + the `authbox` renderer in `admin.js`.
+### 3.4 Level 3 — Tier-2 sub-navigation (a fixed, reserved zone)
+- L3 holds the **active Tier-1 section's Tier-2 sub-views** (Pythia: Chains → StoaChain / Arweave;
+  Activity → StoaChain / Arweave; Connectors → Full API Keys / Register). Sections without sub-views leave it **empty but still
+  present** — L3 reserves a full button-row height always, so switching sections never grows or
+  shrinks the header. The tier-2 buttons *fill into and out of* the fixed zone.
+- **The header is the single home for navigation.** Tier-2 sub-navigation is **never duplicated inside
+  the content panel** — the header buttons ARE the controls (they call the switch directly), and there
+  is no mirrored in-panel button row. (Anti-pattern: a hidden in-panel `<nav>` the header proxies to.)
+
+### 3.5 Strong squared buttons
+Header buttons (`.ph-btn`) are squared (≈8px radius), padded (≈8×16), weight 600. Variants:
+`--primary` (accent fill, the memorable action + the ancient Admin link), `--ghost` (transparent —
+back, inactive sections), `--active` (accent border + tint — the current section/sub-view). A disabled
+control uses `aria-disabled` and reads visibly muted.
+
+### 3.6 Admin variant
+Same `.ph` bar, but admin uses **only Level 1** (medallion + `◄ back` on the left, identity block on
+the right) — its navigation is the **sidebar** (§5), not L2/L3. Everything else is identical.
 
 ---
 
-## 4. The Admin architecture — sidebar + content pane
+## 4. The Landing Stage — a single-screen fixed page
 
-Admin is a **two-column master–detail**: a fixed **left sidebar menu** and a **right content pane**.
-This replaces both the tile-grid and the lined-list patterns; it uses the full `--maxw` efficiently
-(menu + content) instead of one narrow column in a wide page.
+A constructor/automaton landing built around a hero portrait is a **fixed-size page, like a PDF
+page** — not a viewport-filling layout that stretches, and not a long marketing scroll. The portrait
+is the size **etalon**; the page is a fixed height; the window scrolls to it when short.
 
 ```
-┌── Pantheonic Header (admin variant) ───────────────────────────────────────────┐
+┌─ .ph (sticky header) ────────────────────────────────────────────────┐
+├─ .landing-mid (the ONLY scroll region) ──────────────────────────────┤
+│  .shell → .stage  (fixed height = --stage-h) :                        │
+│  ┌ .stage-left (grid col 1) ───────┐   ┌ .stage-art (grid col 2) ──┐  │
+│  │ .hero-id  (compact identity)    │   │                           │  │
+│  │  eyebrow / title / lede /       │   │   the hero portrait,      │  │
+│  │  status medallions              │   │   fixed height = --stage-h │  │
+│  │ ── divider ──                   │   │   (width from its aspect  │  │
+│  │ .work-area (active .tabpanel;   │   │   ≈ a third of the page), │  │
+│  │  fills to portrait height,      │   │   never letterboxed;      │  │
+│  │  scrolls INSIDE only on         │   │   a ⇥ collapse toggle in  │  │
+│  │  overflow)                      │   │   its upper-right corner  │  │
+│  └─────────────────────────────────┘   └───────────────────────────┘  │
+├─ .foot (fixed footer, full-width) ───────────────────────────────────┤
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+### 4.1 Fixed page, not fluid
+- The page is `body { height: 100vh; overflow: hidden; display: flex; flex-direction: column }` with a
+  **fixed header, a fixed footer, and a single scroll region between them** (`.landing-mid`,
+  `flex: 1; overflow-y: auto`).
+- The `.stage` has a **fixed height, `--stage-h`** (the etalon; Pythia: `960px`). It does **not** grow
+  to fill a taller window (the leftover space below it is simply empty) nor shrink on a shorter one
+  (`.landing-mid` scrolls to reveal it). Nothing collapses.
+
+### 4.2 The portrait is the etalon
+- `.stage` is a two-column grid, `grid-template-columns: minmax(0,1fr) auto` — the left column takes
+  the remaining width; the right (`auto`) is exactly the portrait's own width.
+- The portrait is `height: 100%` (of the fixed row, pinned with `grid-template-rows: minmax(0,1fr)`),
+  `width: auto` — a **fixed box at native aspect, never `object-fit`-letterboxed**. Given a 2:3
+  portrait, at `--stage-h` tall it lands at ≈ a third of the page width.
+- A **collapse toggle** pinned to the portrait's upper-right corner hides it and expands the content to
+  the full page width; the choice persists (localStorage).
+
+### 4.3 The work-area is the display surface
+- The left column stacks a **compact identity block** (`.hero-id` — eyebrow, title, one-line tagline,
+  a full-width lede, status medallions; kept minimal so the work-area gets the height) over the
+  **`.work-area`**.
+- The active section renders as one `.tabpanel` in the work-area; it **fills the left column down to
+  the portrait's height** and becomes an **internal scroll viewport only when its own content
+  overflows** that height. The Tier-1/Tier-2 header (§3) drives which section/sub-view shows — the
+  work-area holds no navigation of its own.
+
+### 4.4 Responsive
+Below a width that can't seat the portrait beside a usable content column (Pythia: `900px`), the stage
+**unlocks** to a normal scrolling page: portrait on top (height-capped), content beneath at full
+width, header/footer no longer pinned.
+
+---
+
+## 5. The Admin architecture — sidebar + content pane
+
+Admin is a **two-column master–detail**: a fixed **left sidebar menu** and a **right content pane**.
+This uses the full width efficiently (menu + content) instead of one narrow column in a wide page.
+
+```
+┌── Pantheonic Header (admin variant — Level 1 only) ─────────────────────────────┐
 ├──────────────┬──────────────────────────────────────────────────────────────────┤
 │  SIDEBAR      │  CONTENT PANE                                                     │
-│  ▸ Section A  │                                                                   │
-│  ▸ Section B  │   (the selected section renders here)                             │
-│  ▸ Section C  │                                                                   │
-│  ▸ …          │                                                                   │
+│  ▸ Section A  │   (the selected section renders here)                             │
+│  ▸ Section B  │                                                                   │
 │  ⌁ Planned    │                                                                   │
 └──────────────┴──────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.1 Routing model (exact)
-- **`/admin` (no hash) = the UNSELECTED state.** The sidebar is shown; the content pane shows an
-  **empty prompt**: *"Select a section from the left to begin."* This is a real, addressable state —
-  the natural landing on a fresh visit. It is its own URL (the bare `/admin`), not a menu item.
-- **`/admin#<section>` = a section selected.** The sidebar highlights the active item; the pane
-  renders that section. Deep-linkable and back-navigable; browser Back returns to the previous
-  hash (or to the unselected `/admin`).
-- **Nested sections** use `/admin#<section>/<sub>` and render sub-navigation *inside the pane*
-  (tabs or a sub-list) — the sidebar holds top-level sections only.
-- A **planned/disabled** section shows in the sidebar greyed with a badge (e.g. `PLANNED`) and is
-  inert — clicking posts a short "coming later" note in the pane, never a broken view.
+### 5.1 Routing model (exact)
+- **`/admin` (no hash) = the UNSELECTED state.** Sidebar shown; the pane shows an empty prompt
+  (*"Select a section from the left to begin."*). A real, addressable state — the bare `/admin`.
+- **`/admin#<section>` = a section selected.** Sidebar highlights the active item; the pane renders it.
+  Deep-linkable and back-navigable.
+- **Nested sections** use `/admin#<section>/<sub>` and render sub-navigation *inside the pane* (tabs or
+  a sub-list) — the sidebar holds top-level sections only.
+- A **planned/disabled** section shows greyed in the sidebar with a badge and is inert — clicking posts
+  a short "coming later" note in the pane, never a broken view.
 
-### 4.2 Sidebar
-- Vertical list of top-level sections; each row = icon + label. The active section is highlighted
-  (accent left-border + raised background). Full height of the admin area; its own scroll if long.
-- The sidebar is defined by a **static section-config array** (`{id, icon, label, hash, enabled}`),
-  rendered once — the single source of the menu (Pythia: the `TILES`/section array in `admin.js`).
+### 5.2 Sidebar & pane
+- Sidebar: a vertical list of top-level sections (icon + label), the active one highlighted (accent
+  left-border + raised background), full height with its own scroll if long, driven by a **static
+  section-config array** (`{id, icon, label, hash, enabled}`) — the single source of the menu.
+- Pane: renders exactly one section at a time (or the empty prompt), reusing the site's panel
+  vocabulary (`--panel`, `.panel-note`, forms, rows); a section may carry in-pane tabs for sub-areas.
 
-### 4.3 Content pane
-- Renders exactly one section at a time (or the empty prompt). Section bodies reuse the site's panel
-  vocabulary (`--panel`, `.panel-note`, forms, rows). A section may carry in-pane tabs for sub-areas.
+### 5.3 Gate & responsive
+The whole admin sits behind the shared **AdminGate**, four states resolved from `/api/me`: *checking*
+→ *signed-out* → *signed-in-not-ancient* → *ancient* (the sidebar + pane). Client gating is UX only;
+**every admin mutation re-gates server-side.** At `≤ 820px` the sidebar collapses above the pane as a
+horizontal scrollable row of chips; the routing model is unchanged.
 
-### 4.4 Gate
-The whole admin sits behind the shared **AdminGate** with four states, resolved from `/api/me`:
-*checking* (before it resolves) → *signed-out* (login prompt) → *signed-in-not-ancient* ("requires
-the ancient role") → *ancient* (the sidebar + pane). Client gating is UX only; **every admin
-mutation re-gates server-side.**
-
-### 4.5 Responsive
-At narrow widths (`≤ 820px`) the sidebar collapses above the pane as a horizontal, scrollable row of
-section chips (or a toggle drawer); the content pane takes full width beneath. The routing model is
-unchanged — only the sidebar's placement adapts.
+> **The `[hidden]`-wins rule.** Any element toggled by the `hidden` attribute (gate states, mirrored
+> nav, tab panels) MUST have its own `[hidden] { display: none }` guard when a `display:` rule would
+> otherwise beat it (e.g. `.subtabs { display:flex }`). A `display` rule silently overrides `hidden`
+> and re-shows the element — the class of bug behind both the admin-gate ghost and the duplicated
+> landing sub-nav.
 
 ---
 
-## 5. Identity & roles
+## 6. Identity & roles
 
 - Roles come from the AncientHub OIDC `roles` claim, surfaced by `GET /api/me` →
   `{ authenticated, name, roles }` (an array).
 - **`ancient`** is the only cross-site special-case: it gates the admin surface (`requireAncient`
   server-side; the Admin link + gate client-side). Promote `ancient` to the front when picking the
   displayed role.
-- **RoleBadge:** render the role as a small pill next to the name. Default style = a neutral bordered
-  chip (`--line` border, `--ink-soft` text). **`ancient`** renders in the site accent
-  (`--accent`). Other hub roles (e.g. `observer`, `baron`, `client`) render with the neutral badge
-  unless a site opts to map a specific colour — but the **badge shape is shared**. Treat roles as
-  hub-supplied: render whatever comes; never hardcode an allow-list that would hide a new role.
+- **RoleBadge:** a small pill next to the name. Default = neutral bordered chip (`--line` border,
+  `--ink-soft` text). **`ancient`** renders in the site accent (`--accent`). Other hub roles (e.g.
+  `observer`, `baron`, `client`) use the neutral badge unless a site maps a specific colour — the
+  **badge shape is shared**. Treat roles as hub-supplied: render whatever comes; never hardcode an
+  allow-list that would hide a new role.
 
 ---
 
-## 6. Conformance checklist (a new site is "Pantheonic" when…)
+## 7. Conformance checklist (a site is "Pantheonic" when…)
 
-- [ ] Content is capped at `--maxw: 1536px`, same on public + admin.
+- [ ] Content is capped at `--maxw: 1536px` on every surface; a hero-portrait landing may additionally
+      use `--landing-maxw`, applied to its `.shell` + header inner + footer inner alike.
 - [ ] The `:root` token set uses the canonical names; only values differ.
-- [ ] The Pantheonic Header is present on public + admin, one identity-block implementation, back
-      control on the left, ancient-gated Admin link, identity via `textContent`.
-- [ ] Admin is sidebar + content pane; `/admin` shows the unselected prompt, `/admin#x` shows a
-      section, both deep-linkable; planned sections are greyed + inert.
+- [ ] The header is the sticky 3-level `.ph`: full-chrome-width separator; L1 medallion + one shared
+      identity block (`textContent`, ancient-gated Admin); L2 Tier-1 sections + one memorable action;
+      L3 a fixed-height Tier-2 zone that never resizes the header.
+- [ ] Tier-2 navigation lives ONLY in the header — never duplicated in the content panel.
+- [ ] A hero landing is a fixed-height page: fixed header + footer, one `.landing-mid` scroll region,
+      a `--stage-h` stage that neither grows nor collapses, a fixed-box portrait (no letterbox) with a
+      collapse toggle, and a work-area that fills to the portrait height and scrolls only on overflow.
+- [ ] Admin is sidebar + content pane; `/admin` shows the unselected prompt, `/admin#x` a section,
+      both deep-linkable; planned sections greyed + inert; every `hidden` toggle has its `[hidden]`
+      guard.
 - [ ] The AdminGate's four states are correct; every admin mutation is server-gated.
 - [ ] Roles render as shared-shape badges, `ancient` accented.
 
 ---
 
-*This is v1.0. Extend it — add sections (forms, tables, empty states, toasts, motion) as patterns
+*This is v1.1. Extend it — add sections (forms, tables, empty states, toasts, motion) as patterns
 surface — and log every change in `../CHANGELOG.md`.*
