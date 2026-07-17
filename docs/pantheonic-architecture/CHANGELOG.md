@@ -14,5 +14,13 @@ Pantheon website repo — the central authority every site follows).
 - `patterns/` — the Pythia consumer-key model + its interface-control doc (from Pythia).
 - `archive/` — superseded khronoton package draft (03, superseded by 05) + Codex v2 architecture plan (kept as a worked example).
 
+**Added:**
+- `design/PANTHEONIC-DESIGN-ARCHITECTURE.md` **v1.0** — the UI/UX law: the `--maxw: 1536px` width
+  constant, the canonical colour-token contract (theme-agnostic), the standardized Pantheonic Header
+  (back-left, one identity block, ancient-gated Admin link, role badges), and the sidebar + content-
+  pane admin architecture (unselected `/admin` prompt → `/admin#section` detail, nested routing,
+  responsive collapse). Includes a conformance checklist.
+
 **Pending (next):**
-- `design/` — the Pantheonic Design Architecture guideline (width · tokens · header · admin layout · theming) — being written; Pythia is the reference implementation (sidebar admin + standardized header).
+- Pythia's admin rebuilt as the reference implementation of `design/` v1.0 (sidebar + pane +
+  standardized header), which the guideline then cites concretely.
