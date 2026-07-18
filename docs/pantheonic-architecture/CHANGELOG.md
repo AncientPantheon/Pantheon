@@ -2,6 +2,23 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-07-18 — `design/` v1.2 — the landing has two sanctioned forms; the hero portrait is optional
+
+Clarified that the fixed single-screen stage is **one** valid landing, not the only one, so v1.1 is
+not read as mandating it.
+
+- **`design/PANTHEONIC-DESIGN-ARCHITECTURE.md` → v1.2.** Rewrote §4 (the Landing) to open with the
+  choice between **two sanctioned forms**, equal in standing: **Form A** — the single-screen fixed
+  page (the former §4 spec, now §4.A, Pythia as reference); and **Form B** — a **scrolled display**
+  where the Tier-1 section links scroll the relevant section down the page (new §4.B). A site picks
+  whichever fits its content; neither is more conformant.
+- **The hero portrait is now explicitly optional** in both forms — a visual etalon when present
+  (still the stage-sizing etalon in Form A), never a requirement. §4.A.2 documents the portrait-less
+  Form-A stage (single full-width column); §4.B carries an optional top portrait band.
+- Repointed the §1 `--landing-maxw` exception and the Pythia reference block at **§4.A** (the
+  exception applies to Form A with a portrait only; it does not apply to Form B). Reworded the §7
+  conformance item so either form passes, and noted Form B has no vanilla reference yet.
+
 ## 2026-07-17 — `design/` v1.1 — 3-level header + the single-screen landing stage
 
 The header and landing shape settled through live iteration on Pythia and are now law.

@@ -1,6 +1,6 @@
 # Pantheonic Design Architecture
 
-**Version 1.1 — 2026-07-17.** The UI/UX law for every AncientPantheon surface (the Pantheon website,
+**Version 1.2 — 2026-07-18.** The UI/UX law for every AncientPantheon surface (the Pantheon website,
 constructor-services like Pythia, automatons like Mnemosyne/Caduceus/Aletheia). Follow it so every
 site is **instantly recognizable as one family**: identical shape, layout, header, and identity flow —
 **only the colour theme differs.** This is a living document; record changes in `../CHANGELOG.md`.
@@ -10,11 +10,12 @@ site is **instantly recognizable as one family**: identical shape, layout, heade
 > skeleton, different skin.
 
 Reference implementation: **Pythia** (`constructors/Pythia/apps/pythia/public/{index.html,app.js,admin.html,admin.js,styles.css}`)
-— the clean vanilla reference for the 3-level header (§3), the single-screen landing stage (§4), and
-the sidebar admin (§5), **live at `pythia.ancientholdings.eu`**. Key anchors: the `.ph` header +
-`renderIdentity()` (shared `pantheon-header.js`) for the identity block (§3); the `.landing-mid` /
-`.stage` / `.work-area` fixed page + `renderTier2()` header-owned sub-nav (§4); the `.admin-layout`
-sidebar+pane + `routeFromHash()` (§5); the `.role-badge` / `--accent` alias (§2, §6).
+— the clean vanilla reference for the 3-level header (§3), the **single-screen fixed landing (Form A,
+§4.A)**, and the sidebar admin (§5), **live at `pythia.ancientholdings.eu`**. Key anchors: the `.ph`
+header + `renderIdentity()` (shared `pantheon-header.js`) for the identity block (§3); the
+`.landing-mid` / `.stage` / `.work-area` fixed page + `renderTier2()` header-owned sub-nav (§4.A); the
+`.admin-layout` sidebar+pane + `routeFromHash()` (§5); the `.role-badge` / `--accent` alias (§2, §6).
+The **scrolled landing (Form B, §4.B)** is the other sanctioned shape and has no vanilla reference yet.
 
 ---
 
@@ -32,8 +33,8 @@ anti-pattern this fixes).
 Everything — header, hero, admin — lays out inside a `.shell` (or equivalent) capped at `--maxw`.
 Full-bleed backgrounds (starfield, gradients) may span the viewport, but *content* stops at `--maxw`.
 
-> **Sanctioned exception — the hero-portrait landing.** A landing built around a full-height hero
-> portrait (§4) may widen to a second constant, **`--landing-maxw`** (Pythia: `1760px`), so the
+> **Sanctioned exception — the hero-portrait landing.** A Form-A landing built around a full-height
+> hero portrait (§4.A) may widen to a second constant, **`--landing-maxw`** (Pythia: `1760px`), so the
 > content column beside the portrait stays usable on wide screens. When a site takes the exception it
 > applies `--landing-maxw` to the landing `.shell`, its header inner, AND its footer inner so all
 > three left-edges align. `--maxw` still governs every other surface (admin, sub-pages). This is the
@@ -134,10 +135,31 @@ the right) — its navigation is the **sidebar** (§5), not L2/L3. Everything el
 
 ---
 
-## 4. The Landing Stage — a single-screen fixed page
+## 4. The Landing — two sanctioned forms
 
-A constructor/automaton landing built around a hero portrait is a **fixed-size page, like a PDF
-page** — not a viewport-filling layout that stretches, and not a long marketing scroll. The portrait
+The public landing takes **one of two shapes**, and a site chooses whichever fits its content. Both
+are equally Pantheonic — neither is the "correct" one, and a site is not less conformant for picking
+either:
+
+- **Form A — the single-screen fixed page (§4.A).** A fixed-size page, like a PDF page: fixed header,
+  fixed footer, one scroll region between them, sized to sit on a single screen. The reference is
+  Pythia. Choose it when the landing is self-contained enough to fit one poster-like stage.
+- **Form B — the scrolled display (§4.B).** A normal page that scrolls, where the Tier-1 section links
+  scroll the relevant section down into view. Choose it when the landing has more to say than one
+  screen holds — sequential sections, longer-form content.
+
+> **The hero portrait is optional — in both forms.** When present it is a visual *etalon* (in Form A
+> it also sizes the stage, §4.A.2); it is never a requirement. A landing with no portrait is fully
+> conformant. Everything else in this document — `--maxw`, the tokens (§2), the 3-level header (§3),
+> the admin (§5), the identity flow (§6) — is identical whichever form and whether or not a portrait
+> is used.
+
+---
+
+### 4.A Form A — the single-screen fixed page
+
+A landing built around a hero portrait is a **fixed-size page, like a PDF page** — not a
+viewport-filling layout that stretches, and not a long marketing scroll. The portrait (when present)
 is the size **etalon**; the page is a fixed height; the window scrolls to it when short.
 
 ```
@@ -158,7 +180,7 @@ is the size **etalon**; the page is a fixed height; the window scrolls to it whe
 └───────────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.1 Fixed page, not fluid
+### 4.A.1 Fixed page, not fluid
 - The page is `body { height: 100vh; overflow: hidden; display: flex; flex-direction: column }` with a
   **fixed header, a fixed footer, and a single scroll region between them** (`.landing-mid`,
   `flex: 1; overflow-y: auto`).
@@ -166,7 +188,11 @@ is the size **etalon**; the page is a fixed height; the window scrolls to it whe
   to fill a taller window (the leftover space below it is simply empty) nor shrink on a shorter one
   (`.landing-mid` scrolls to reveal it). Nothing collapses.
 
-### 4.2 The portrait is the etalon
+### 4.A.2 The portrait is the etalon (when present)
+> A Form-A landing **without** a portrait drops the second grid column entirely: `.stage` becomes a
+> single full-width column of `.hero-id` + `.work-area`, still at fixed `--stage-h`. The rest of this
+> subsection applies only when a portrait is used.
+
 - `.stage` is a two-column grid, `grid-template-columns: minmax(0,1fr) auto` — the left column takes
   the remaining width; the right (`auto`) is exactly the portrait's own width.
 - The portrait is `height: 100%` (of the fixed row, pinned with `grid-template-rows: minmax(0,1fr)`),
@@ -175,7 +201,7 @@ is the size **etalon**; the page is a fixed height; the window scrolls to it whe
 - A **collapse toggle** pinned to the portrait's upper-right corner hides it and expands the content to
   the full page width; the choice persists (localStorage).
 
-### 4.3 The work-area is the display surface
+### 4.A.3 The work-area is the display surface
 - The left column stacks a **compact identity block** (`.hero-id` — eyebrow, title, one-line tagline,
   a full-width lede, status medallions; kept minimal so the work-area gets the height) over the
   **`.work-area`**.
@@ -184,10 +210,46 @@ is the size **etalon**; the page is a fixed height; the window scrolls to it whe
   overflows** that height. The Tier-1/Tier-2 header (§3) drives which section/sub-view shows — the
   work-area holds no navigation of its own.
 
-### 4.4 Responsive
+### 4.A.4 Responsive
 Below a width that can't seat the portrait beside a usable content column (Pythia: `900px`), the stage
 **unlocks** to a normal scrolling page: portrait on top (height-capped), content beneath at full
-width, header/footer no longer pinned.
+width, header/footer no longer pinned. (A portrait-less Form-A stage simply keeps its single column
+and unlocks its fixed height into normal flow at the same breakpoint.)
+
+---
+
+### 4.B Form B — the scrolled display
+
+When the landing has more than one screen of content, use a normal scrolling page instead of the
+fixed stage. This is the ordinary "the links scroll you down the page" layout — sanctioned and equal
+to Form A, not a fallback.
+
+```
+┌─ .ph (sticky header) ────────────────────────────────────────────────┐
+│  (optional hero portrait band — top of page, height-capped)           │
+├─ page scrolls normally (the body IS the scroll surface) ──────────────┤
+│  .shell → #section-a   ← Tier-1 "Section A" scrolls here              │
+│  .shell → #section-b   ← Tier-1 "Section B" scrolls here              │
+│  .shell → #section-c   …                                              │
+├─ .foot (full-width footer, in normal flow) ──────────────────────────┤
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+- **The document scrolls, not an inner region.** There is **no** `.landing-mid` single scroll region
+  and **no** `--stage-h` — the body itself scrolls and the header (§3) stays `position: sticky` on
+  top. The footer sits in normal flow at the end.
+- **The Tier-1 links drive scroll position.** Each Tier-1 section (§3.3) is an anchored block down the
+  page; clicking a section scrolls it into view (`scrollIntoView` / anchor), and the active section
+  updates as the reader scrolls past it (scroll-spy). **The header stays the single home for
+  navigation (§3.4)** — the sections are still never mirrored as an in-content nav row.
+- **Width is `--maxw` (§1).** Each section's content caps at `--maxw` inside its own `.shell`. The
+  `--landing-maxw` exception does **not** apply to Form B — it exists only to seat a fixed portrait
+  beside a content column in Form A.
+- **The hero portrait, if used, is a top band** — full-width or `.shell`-capped, height-capped, above
+  the first section — not pinned beside the content. Without one the page opens straight into the
+  identity block and first section.
+- Tier-2 sub-views (§3.4), when a section has them, still live in the header's L3 zone; in Form B they
+  switch the content shown within that section's block (they do not have to be separate anchors).
 
 ---
 
@@ -261,9 +323,12 @@ horizontal scrollable row of chips; the routing model is unchanged.
       identity block (`textContent`, ancient-gated Admin); L2 Tier-1 sections + one memorable action;
       L3 a fixed-height Tier-2 zone that never resizes the header.
 - [ ] Tier-2 navigation lives ONLY in the header — never duplicated in the content panel.
-- [ ] A hero landing is a fixed-height page: fixed header + footer, one `.landing-mid` scroll region,
-      a `--stage-h` stage that neither grows nor collapses, a fixed-box portrait (no letterbox) with a
-      collapse toggle, and a work-area that fills to the portrait height and scrolls only on overflow.
+- [ ] The landing takes **one of the two sanctioned forms** (§4). Form A — a single-screen fixed page:
+      fixed header + footer, one `.landing-mid` scroll region, a `--stage-h` stage that neither grows
+      nor collapses, and (when a portrait is used) a fixed-box portrait (no letterbox) with a collapse
+      toggle over a work-area that fills to portrait height and scrolls only on overflow. OR Form B — a
+      scrolled display: the body scrolls, header sticky, and Tier-1 links scroll their section into
+      view. **The hero portrait is optional in both**, and either form is fully conformant.
 - [ ] Admin is sidebar + content pane; `/admin` shows the unselected prompt, `/admin#x` a section,
       both deep-linkable; planned sections greyed + inert; every `hidden` toggle has its `[hidden]`
       guard.
@@ -272,5 +337,5 @@ horizontal scrollable row of chips; the routing model is unchanged.
 
 ---
 
-*This is v1.1. Extend it — add sections (forms, tables, empty states, toasts, motion) as patterns
+*This is v1.2. Extend it — add sections (forms, tables, empty states, toasts, motion) as patterns
 surface — and log every change in `../CHANGELOG.md`.*
