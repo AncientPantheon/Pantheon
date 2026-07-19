@@ -2,6 +2,21 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-07-19 — `design/` v1.3 — every navigable view has its own URL (no single opaque link)
+
+Made addressability a Pantheon-wide law, not just an admin detail.
+
+- **`design/PANTHEONIC-DESIGN-ARCHITECTURE.md` → v1.3.** New **§3.7 — every navigable view has its own
+  URL.** Every view reachable by a Tier-1/Tier-2 button, and every page of a Pantheonic site, has its
+  **own distinct URL** (path or `#hash`) — deep-linkable, shareable, back-navigable. A single URL that
+  swaps content underneath it with no address change is forbidden: **there is never "one link" for the
+  whole surface.** The URL is the source of truth (render from the hash on load / `popstate` /
+  `hashchange`), generalizing the admin routing model (§5.1) to every surface.
+- Both landing forms are bound to it (§4): Form B's anchored sections are addressable by construction;
+  **§4.A.3** now states Form A drives its work-area panels from the hash, so every section/sub-view is
+  deep-linkable even though the fixed page doesn't scroll between them.
+- Added the matching **§7 conformance item**.
+
 ## 2026-07-18 — `design/` v1.2 — the landing has two sanctioned forms; the hero portrait is optional
 
 Clarified that the fixed single-screen stage is **one** valid landing, not the only one, so v1.1 is

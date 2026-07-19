@@ -1,6 +1,6 @@
 # Pantheonic Design Architecture
 
-**Version 1.2 — 2026-07-18.** The UI/UX law for every AncientPantheon surface (the Pantheon website,
+**Version 1.3 — 2026-07-19.** The UI/UX law for every AncientPantheon surface (the Pantheon website,
 constructor-services like Pythia, automatons like Mnemosyne/Caduceus/Aletheia). Follow it so every
 site is **instantly recognizable as one family**: identical shape, layout, header, and identity flow —
 **only the colour theme differs.** This is a living document; record changes in `../CHANGELOG.md`.
@@ -133,6 +133,24 @@ control uses `aria-disabled` and reads visibly muted.
 Same `.ph` bar, but admin uses **only Level 1** (medallion + `◄ back` on the left, identity block on
 the right) — its navigation is the **sidebar** (§5), not L2/L3. Everything else is identical.
 
+### 3.7 Every navigable view has its own URL (no single opaque link)
+Navigation is **addressable, never opaque**. Every view reachable by a **Tier-1 or Tier-2 button** —
+and **every page of a Pantheonic site** — has its **own distinct URL** (a path or a `#hash`),
+deep-linkable, shareable, and back-navigable. A single URL that swaps content underneath it without
+the address changing is the anti-pattern this forbids: **there is never "one link" for the whole
+surface** — one link per view, always.
+
+- Each **Tier-1 section** maps to its own route (Pythia: `/#chains`, `/#activity`, …); each **Tier-2
+  sub-view** extends it (`/#chains/stoachain`). Clicking a header button **navigates to that URL**;
+  opening that URL restores that exact view; **Back** returns to the previous one.
+- The **URL is the source of truth** for what's shown: derive the current view **from** the path/hash
+  — parse it on load and on `popstate`/`hashchange` — rather than flipping content in memory and
+  letting the URL (at best) shadow it. Selecting a view updates the URL; the URL update renders it.
+- This is the **same routing model the admin already uses** (§5.1: `/admin#section`,
+  `/admin#section/sub`), **generalized to every surface**. Both landing forms obey it (§4): Form B's
+  anchored sections are addressable by construction; Form A drives its work-area panels from the hash,
+  not from in-memory state alone.
+
 ---
 
 ## 4. The Landing — two sanctioned forms
@@ -208,7 +226,8 @@ is the size **etalon**; the page is a fixed height; the window scrolls to it whe
 - The active section renders as one `.tabpanel` in the work-area; it **fills the left column down to
   the portrait's height** and becomes an **internal scroll viewport only when its own content
   overflows** that height. The Tier-1/Tier-2 header (§3) drives which section/sub-view shows — the
-  work-area holds no navigation of its own.
+  work-area holds no navigation of its own. **Which panel shows is driven by the URL hash (§3.7),** so
+  every section/sub-view is deep-linkable even though the page itself doesn't scroll between them.
 
 ### 4.A.4 Responsive
 Below a width that can't seat the portrait beside a usable content column (Pythia: `900px`), the stage
@@ -323,6 +342,8 @@ horizontal scrollable row of chips; the routing model is unchanged.
       identity block (`textContent`, ancient-gated Admin); L2 Tier-1 sections + one memorable action;
       L3 a fixed-height Tier-2 zone that never resizes the header.
 - [ ] Tier-2 navigation lives ONLY in the header — never duplicated in the content panel.
+- [ ] Every Tier-1/Tier-2 view and every page has its **own** deep-linkable URL (path or `#hash`),
+      rendered from the URL on load and Back — never a single opaque link for the whole surface (§3.7).
 - [ ] The landing takes **one of the two sanctioned forms** (§4). Form A — a single-screen fixed page:
       fixed header + footer, one `.landing-mid` scroll region, a `--stage-h` stage that neither grows
       nor collapses, and (when a portrait is used) a fixed-box portrait (no letterbox) with a collapse
@@ -337,5 +358,5 @@ horizontal scrollable row of chips; the routing model is unchanged.
 
 ---
 
-*This is v1.2. Extend it — add sections (forms, tables, empty states, toasts, motion) as patterns
+*This is v1.3. Extend it — add sections (forms, tables, empty states, toasts, motion) as patterns
 surface — and log every change in `../CHANGELOG.md`.*
