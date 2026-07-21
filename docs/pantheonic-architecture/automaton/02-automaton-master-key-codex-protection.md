@@ -254,6 +254,32 @@ proven not to brick the codex."
 
 ---
 
+## 6b. Codex-mount UI convention — a single lock control
+
+Server-held auto-unlock (§8b) has a direct UI consequence for how the codex
+package is **mounted**. The master key lives on the server, the codex opens at
+boot with no operator password prompt, and any flow that needs the password
+re-submits it automatically. So the lock/unlock affordance never needs a password
+field — and there must be exactly **one** of it.
+
+The codex package already renders a **Lock / Unlock control in its identity row** —
+the canonical, always-present affordance (backed here by the auto-password-resolver,
+so unlocking it costs no typing). When an automaton wraps the mounted codex, its
+top-bar action slot carries **portability only** — the custody-appropriate pair
+(e.g. **Download / Load**, the server-custody equivalents of the standalone's
+Export / Load). It must **NOT** add a second Lock button in the top bar: that is
+redundant chrome for a control that already exists, and works, one row below.
+
+- **One lock, one place.** The lock/unlock affordance is the package's identity-row
+  control — never duplicated in the automaton's top bar.
+- **Top-bar actions = portability.** The automaton's wrapper adds only its
+  custody-appropriate portability pair; nothing else.
+- **Reference (Mnemosyne):** `app/admin/codex/MnemosyneCodex.tsx` mounts the shared
+  `CodexShell` with `topbarActions={<CodexPortabilityControls />}` — Download/Load
+  and no wrapper Lock button; the identity-row control is the sole lock.
+
+---
+
 ## 7. Universal automaton checklist
 
 For any automaton that custodies a codex under a master key:
@@ -273,8 +299,49 @@ For any automaton that custodies a codex under a master key:
 - [ ] Rotation is gated (strongest admin + fresh re-confirm + explicit
       key-export acknowledgement).
 - [ ] A regression test proves the codex round-trips through a rotation.
+- [ ] The codex mount shows **one** lock control — the package's identity-row
+      affordance; the automaton's top bar carries portability actions only
+      (Download/Load), never a duplicate Lock button (§6b).
 
 ---
+
+## 8b. Cross-entity roster + accepted variants (the settled method)
+
+Verified in code (2026-07-19): the **hub** (`lib/vault.ts`, `lib/hub-codex-store.ts`) and
+**Mnemosyne** (`lib/mnemosyneVault.ts`, `lib/mnemosyneCodexStore.ts`) implement §1–§7
+**identically in scheme**. Two things differ per-entity — these are **accepted variants, not
+drift**; the invariants below are non-negotiable and the same everywhere.
+
+**Non-negotiable invariants (every entity):**
+- libsodium `crypto_secretbox_easy` — `sealed_box = nonce(24) ‖ ciphertext`; `MASTER_KEY =
+  base64_decode(env) `, **exactly 32 bytes**.
+- Two layers: inner per-entry secrets encrypted under a machine-generated **codex password**
+  (the master key never sees plaintext key material); outer = the snapshot **and** the codex
+  password each sealed under the master key as **ordinary vault entries** (canonical rule #1).
+- **Server-held auto-unlock**: the master key is held by the server; the codex loads and
+  unlocks at boot with **no operator password prompt** — the admin gains access automatically.
+- Rotation = **generic vault re-seal** (§4), never a raw key swap.
+
+**Accepted per-entity variants:**
+1. **Master-key env var name:** `<ENTITY>_MASTER_KEY`, always a 32-byte base64 value.
+2. **Vault storage medium:** **DB rows** *or* **sealed files** — both are "one vault, one
+   `seal()`, generic re-seal." A service with no database uses the file variant.
+
+**Roster:**
+
+| Entity | Env var | Storage | Codex key handling |
+|---|---|---|---|
+| AncientHub | `SECRETS_MASTER_KEY` | SQLite `secrets_vault` rows (`codex_dropin`) | canonical |
+| Mnemosyne | `MNEMOSYNE_MASTER_KEY` | sealed files (`*.sealed`) | canonical (file variant) |
+| **Pythia** | `PYTHIA_MASTER_KEY` | sealed files (no DB) | **converging** — see note |
+
+> **Pythia note.** Pythia joins via the **file variant** (like Mnemosyne, since it has no DB),
+> master key `PYTHIA_MASTER_KEY` (32-byte base64). Its **interim** `SealedVault` (AES-256-GCM +
+> scrypt, holding only the hub HMAC operator secret) is a pre-sovereignty drift; the sovereign
+> upgrade replaces it with the canonical libsodium vault and migrates that operator secret into
+> it as an ordinary vault entry — so Pythia ends with **one vault, one `seal()`** covering the
+> codex snapshot, the codex password, and the HMAC secret. If any entity later drifts from the
+> scheme above, that entity's agent brings it back in line — this section is the reference.
 
 ## 8. Hub reference files (read these when porting)
 

@@ -2,6 +2,20 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-07-21 — `automaton/02` — codex mount shows one lock control (no duplicate top-bar Lock)
+
+Settled how automatons mount the codex UI, so the server-sealed operator codex stops carrying two
+Lock buttons.
+
+- **`automaton/02-automaton-master-key-codex-protection.md`.** New **§6b — codex-mount UI convention:
+  a single lock control.** Because the automaton's codex is server-held auto-unlock, the lock/unlock
+  affordance needs no password field and there must be exactly one of it — the codex package's
+  **identity-row** control. An automaton wrapping the mounted codex gives its top-bar action slot
+  **portability only** (Download/Load, the server-custody equivalents of the standalone's Export/Load)
+  and must **not** add a second Lock button. Added the matching **§7 checklist item**.
+- Reference implementation: Mnemosyne `app/admin/codex/MnemosyneCodex.tsx` now mounts
+  `topbarActions={<CodexPortabilityControls />}` (no wrapper Lock button).
+
 ## 2026-07-19 — `design/` v1.3 — every navigable view has its own URL (no single opaque link)
 
 Made addressability a Pantheon-wide law, not just an admin detail.
