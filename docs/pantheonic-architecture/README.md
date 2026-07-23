@@ -18,14 +18,16 @@ Read in this order:
    colour-token contract (swap values, keep names), the standardized **Pantheonic Header**, and the
    **sidebar + content-pane admin** layout. This is what makes the family instantly recognizable.
 2. **[`automaton/`](./automaton)** — how an automaton is *structured*: the Pantheonic Automaton
-   Blueprint (container, tokenless deploy, AncientHub login, versioning) and the master-key
-   sealed-vault crypto every automaton reuses.
+   Blueprint (container, tokenless deploy, AncientHub login, versioning), the master-key
+   sealed-vault crypto every automaton reuses, and the **Deploy Panel standard** (status readout +
+   always-moving progress) every on-box deploy must implement.
 3. **[`identity/`](./identity)** — hub login + ownership verification, which appear *everywhere*: the
    central AncientHub SSO service, the "Login with AncientHub in any consumer" recipe, the generic
    Apollo-ownership verifier (`/apollo-verify`), and the dual-Apollo consumer-identity architecture.
 4. **[`organs/`](./organs)** — the shared constructor packages you consume (`@ancientpantheon/codex`,
    `khronoton`, …): the package-structure blueprint, how to wire the engine in, the codex re-key
-   primitive, and how to host the Codex in any consumer.
+   primitive, how to host the Codex in any consumer, and the **organ dependency contract**
+   (publishing organs + adopting a new organ version without breaking consumers).
 5. **[`patterns/`](./patterns)** — worked cross-repo *feature* references (e.g. the Pythia
    consumer-key model). Read for example, not required to stand up a new site.
 6. **[`archive/`](./archive)** — superseded or point-in-time docs kept for historical reference. Not
@@ -36,9 +38,9 @@ Read in this order:
 | Section | Holds | Status |
 |---|---|---|
 | `design/` | width · tokens · header · admin layout · theming | the UI/UX standard |
-| `automaton/` | the blueprint · master-key sealed-vault | how to build an automaton |
+| `automaton/` | the blueprint · master-key sealed-vault · deploy-panel + progress standard | how to build an automaton |
 | `identity/` | SSO · consumer-login · Apollo verifier · dual-Apollo identity | login/verification everywhere |
-| `organs/` | package blueprint · khronoton wire-in · codex re-key · consumer integration | the shared packages |
+| `organs/` | package blueprint · khronoton wire-in · codex re-key · consumer integration · dependency contract | the shared packages |
 | `patterns/` | consumer-key model + interface-control doc | reference feature implementations |
 | `archive/` | superseded khronoton package draft · Codex v2 plan | historical / example |
 
@@ -47,7 +49,8 @@ Read in this order:
 The standards point at real, running code so nobody builds from prose alone:
 
 - **Pythia** (`constructors/Pythia`) — the vanilla-JS reference for `design/` (sidebar admin +
-  standardized header) and the constructor-service shape (`automaton/` §13).
+  standardized header), the constructor-service shape (`automaton/` §13), and the **deploy panel**
+  (`automaton/05` — status readout + always-moving progress).
 - **Mnemosyne** (`automatons/Mnemosyne`) — the React reference for the automaton organs (Codex UI,
   sealed vault, on-box deploy). *(Mnemosyne predates this standard and still has drift — 3 widths, 2
   token sets — that it will align up to; treat Pythia as the clean `design/` reference.)*

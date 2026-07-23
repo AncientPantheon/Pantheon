@@ -2,6 +2,93 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-07-22 — `organs/ORGAN-DEPENDENCY-CONTRACT.md` (NEW) — publishing organs, and adopting them safely
+
+Codex 0.6.1 / Khronoton 0.4.2 were **patch** releases with a byte-identical public API that
+nevertheless **renamed their required peer dependencies** (`@stoachain/{ouronet-core,dalos-crypto}`
+→ `@ouronet/*`). A consumer diffing only exports would have concluded "nothing changed." New
+two-audience contract so organ upgrades stop breaking consumers in ways the version number hides.
+
+- **Consumer rules.** **R1 — declare every REQUIRED peer of every organ you consume**, even one you
+  never import: npm ≥7 auto-installs peers, so omitting the declaration *appears* to work and the
+  lockfile even pins it — but the dependency then exists only as a side effect of one resolver's
+  default, and vanishes under pnpm-strict or `--legacy-peer-deps` ("the lockfile makes an install
+  reproducible; the declaration makes it intentional"). **R2 — diff the PEERS on every bump, not
+  just the exports.** **R3 — verify against the published tarball, not the source repo.**
+  **R4 — every declared `exports` subpath must resolve to a real file** (a dangling subpath installs
+  fine and breaks the consumer's *bundler* later). **R5 — adopting an organ is install → rebuild →
+  restart**, never install alone, for any automaton that bundles organ UIs into browser islands.
+- **Author rules.** **A1 — `peerDependenciesMeta` keys must exactly match `peerDependencies` keys**
+  (0.4.1 renamed a peer but left the meta under the old name, silently dropping `optional: true` and
+  warning every consumer; fixed in 0.4.2). **A2 — be explicit about required vs optional.**
+  **A3 — never drop or re-point an `exports` subpath in a patch**; the exports map is public API.
+  **A4 — ship the CHANGELOG inside the tarball**, plus a git tag and GitHub Release per version.
+- A copy-paste **organ-bump checklist** (peer/exports/tarball commands + consumer verification),
+  the Codex 0.6.1 / Khronoton 0.4.2 **worked example**, and six invariants — closing with: the proof
+  an organ was adopted is the **deployed** panel row turning green, not a local install.
+
+## 2026-07-22 — `automaton/05` — constructor-adoption policy + the organ-version layout trap
+
+Two hard-won additions after a Pythia deploy advertised a constructor update it was structurally
+incapable of installing, costing an 11m20s rebuild that changed nothing.
+
+- **`automaton/05` → new §1c — "available" MUST mean *what Deploy installs*.** An automaton declares
+  **one** constructor-adoption policy, the deployer implements it, and the panel reports it.
+  Documents the concrete failure (image builds with `npm ci` = lockfile-exact, deployer never bumped
+  the pins, panel computed "available" from npm `dist-tags.latest` → a promise the build could not
+  keep), and notes the two rows were mutually inconsistent (entity "available" = deploy branch,
+  constructor "available" = npm). Specifies the two legitimate policies —
+  **auto-adopt** (deployer `npm install <organ>@latest` before the build; "available" = npm latest)
+  and **pinned** (build installs the lockfile; "available" = the deploy branch's pin, with npm-latest
+  demoted to a non-deployable *"bump the dependency to adopt"* hint) — and sets **auto-adopt as the
+  canonical default**, since constructors are first-party organs that should not need a bump commit
+  per release. Mnemosyne implemented auto-adopt from the start, which is exactly why it picked up
+  Codex 0.6.1 / Khronoton 0.4.2 while Pythia could not.
+- **`automaton/05` → new §1d — the organ-version layout trap.** npm decides *per dependency* whether
+  to hoist an organ to the workspace root or leave it nested under the consuming workspace, and a
+  version conflict anywhere flips it between installs. Reading the installed version by walking up
+  from `process.cwd()` therefore breaks: in a container the cwd is the workspace **root**, and an
+  upward walk can never see a package nested *below* it — the panel silently shows `vunknown` for
+  every constructor. Resolve from the **reading module's own location** first (`import.meta.url`),
+  which passes through both `apps/<app>/node_modules` and the root on the way up.
+- Two new conformance-checklist items covering both, including *verify by actually deploying a newly
+  published organ and watching the row go green*.
+- Reference implementation: **Pythia v2.2.1**.
+
+## 2026-07-21 — `automaton/05` (NEW) — the Deploy Panel: status readout + always-moving progress
+
+A blue-green rebuild sits inside single silent steps for minutes (native addon compile, `chown -R`),
+so a streamed build log goes motionless and a healthy deploy is indistinguishable from a wedged one.
+Operators were killing good deploys. New canonical standard for every automaton/constructor with an
+on-box deploy.
+
+- **`automaton/05-deploy-panel-and-progress.md`.** The canonical rule: **at any instant while a deploy
+  runs, something in the deploy box must be visibly moving; if motion stops, the deploy is stuck.**
+  Specifies both halves of the panel and the machinery behind them, framework-agnostically:
+  - **Status readout** — the entity + `CONSTRUCTORS` version groups (framed rows, installed → available
+    chips, independent per-probe degradation), and the deploy readout **Mode · Live color · Loopback
+    port · Container · Version** plus the blue-green explainer, so a colour/port incident is
+    diagnosable without SSH.
+  - **API contract** — the three endpoints and their fixed shapes, including the new **`active`** field
+    (newest non-terminal deploy + its real `startedAt`) and the SSE event set; plus the
+    survive-the-swap requirement (log on the shared volume, client clears buffer on reconnect).
+  - **Server heartbeat (load-bearing)** — the host deployer emits a log line every ~6s for the whole
+    run, killed on every exit path. This is what makes the rule true instead of decorative, and yields
+    the three-state diagnosis (ticking+advancing = healthy · ticking+frozen = slow but fine ·
+    **stopped** = genuinely stuck).
+  - **Progress display** — status chip, real `Step N/M` parsed from the log, a 1s ticking timer, a
+    looping pacman heartbeat animation, a **>20s stall watchdog** that pauses + reddens it, **auto-attach**
+    to a running deploy this browser did not trigger, and **auto-reload on success** (requires
+    `Cache-Control: no-cache` on admin assets or the reload silently shows the old UI).
+  - **Dev mode** — localhost has no docker/proxy, so Deploy must not be a dead button: it pulls the
+    constructors at `@latest` and rebuilds, writing the *same* log/status contract so the whole
+    progress display works locally too.
+  - **Inline confirmation** (never a modal), with the `[hidden] { display: none }` trap called out.
+  - Closes with a **12-point conformance checklist** and a Pythia reference-file map.
+- Reference implementation: **Pythia v2.2.0** (vanilla JS + Hono). **Mnemosyne** is the alignment
+  target — it needs both the full status readout (Mode/Live color/Loopback port/Container/Version) and
+  the progress machinery.
+
 ## 2026-07-21 — `automaton/02` — codex mount shows one lock control (no duplicate top-bar Lock)
 
 Settled how automatons mount the codex UI, so the server-sealed operator codex stops carrying two
