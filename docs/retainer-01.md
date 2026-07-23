@@ -153,7 +153,7 @@ All 5 AncientPantheon workspace repos: **0 unpushed, 0 uncommitted**, all on Git
 |---|---|---|
 | Pantheon | main | the website (this repo) |
 | Pythia | main | added `scripts/localhost-dev.mjs` + dev script; `pythia-stats.json` gitignored (generated) |
-| Codex | feat/codex-migration-c-d | work on a feature branch, not main; its `.media` **is** tracked (4 files) |
+| Codex | main | single-trunk since 2026-07-23 (`main` fast-forwarded onto the old `feat/codex-migration-c-d`, which was then deleted); its `.media` **is** tracked (4 files) |
 | Khronoton | main | `.media` now gitignored |
 | Aletheia | main | scaffold + planning docs |
 
