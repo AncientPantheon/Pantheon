@@ -2,6 +2,37 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-07-31 — `organs/06-pythia-client-wire-in.md` (NEW) — the third organ, and 3 superseded docs archived
+
+Pythia's connector protocol shipped this session (`@ancientpantheon/pythia-client@2.3.0`), the last
+of the three organs `organs/05-khronoton-engine-wire-in.md` §4's staged-integration gate was written
+for ("do not wire consumers live until all three Constructors — Pythia, Codex, Khronoton — are
+finalized"). Writing the wire-in handoff surfaced that three existing docs described a protocol that
+was never built — grounded assumptions from a stale local `PYTHIA.pact` checkout, corrected once the
+*live* on-chain module was verified directly.
+
+- **`organs/06-pythia-client-wire-in.md` (NEW).** What `@ancientpantheon/pythia-client` actually is
+  (a pre-existing keyless read-gateway transport client, PLUS — as of `2.3.0` — a connector-auth
+  SDK bolted on top), the real shipped protocol (a **symmetric** dual-Apollo Standard/Smart pair,
+  module `PYTHIA` with tables `PYTHIA|S|ApiKey`/`PYTHIA|S|DualLink`, a **repeating** 3-hour
+  ephemeral-secret challenge/sign/verify round trip — not a one-time activation), how to wire it
+  into a consumer (`ApolloSigner`/`SecretStorage`/`PythiaConnector`/`pythiaKey`), and how to add it
+  as the third `CONSTRUCTORS` row in a consumer's own deploy panel per `automaton/05` §1a/1c.
+- **3 docs archived as superseded**, each left in place with a pointer banner to the new doc:
+  `archive/PYTHIA-CONSUMER-KEY-MODEL.md` (single-key, baked-header, one-time activation),
+  `archive/HANDOFF-consumer-key-INTERFACES.md` (the `APIARY` module-naming ICD),
+  `archive/DUAL-APOLLO-CONSUMER-IDENTITY.md` (an **asymmetric** S/C role-split model — an existing
+  owner-registered slot vs. a separate consumer identity — which is not what shipped; its
+  caching/revocation/signing-stays-local reasoning was correct, only the role split and on-chain
+  naming were wrong). `patterns/` is now empty as a result — its former content either moved to
+  `organs/` (a wire-in handoff, not a "worked example") or to `archive/` (superseded).
+- **README.md** updated: `organs/` now documents 3 finalized organs, not 2; `identity/`'s
+  dual-Apollo mention removed (moved to `organs/06`); `patterns/` and `archive/` rows updated;
+  Pythia's reference-implementation entry extended to name the connector protocol itself.
+- Per `organs/05-khronoton-engine-wire-in.md` §4's standing rule, this handoff documents the pattern
+  only — **whether any specific consumer (Mnemosyne, or Pythia herself as a self-referential
+  consumer) actually goes live on it remains the admin's call**, made separately per consumer.
+
 ## 2026-07-22 — `organs/ORGAN-DEPENDENCY-CONTRACT.md` (NEW) — publishing organs, and adopting them safely
 
 Codex 0.6.1 / Khronoton 0.4.2 were **patch** releases with a byte-identical public API that

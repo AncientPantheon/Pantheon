@@ -188,6 +188,9 @@ local` (one user). None of §0 / §2.1 applies.
 - `docs/CODEX-V2-ARCHITECTURE-PLAN.md` — Codex v2 architecture (Codex = keys, Pythia =
   reads injection point).
 - `@ancientpantheon/pythia-client` — the `read`/`send`(keyless)/`poll`/`health` client
-  a `PythiaConnection` wraps.
+  a `PythiaConnection` wraps. As of `2.3.0` this same package also ships the **connector-auth
+  SDK** (`PythiaConnector`, gated `x-pythia-key` access via a dual-Apollo identity) — see
+  `organs/06-pythia-client-wire-in.md` if this consumer wants attributed/gated access rather
+  than the anonymous reads this handoff covers.
 - The AncientHub admin-login integration — **separate handoff, owned by the hub side**
   (out of scope here; §0 only needs its `ancientadmin` boolean).

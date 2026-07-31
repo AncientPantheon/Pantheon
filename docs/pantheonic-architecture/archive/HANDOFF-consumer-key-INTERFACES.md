@@ -1,5 +1,16 @@
 # Interface Control — Apollo Pythia API-key handoffs (SETTLED contracts)
 
+> **⚠ SUPERSEDED (2026-07-31).** The `APIARY` module name, `APIARY|T|ApiKeys` table,
+> `A_TurnApiOn`/`A_TurnApiOff` functions, and the single-Apollo-key model this ICD
+> settles were never built — none of the five companion handoffs this doc references
+> as authoritative for shipped. The *live* on-chain module is named **`PYTHIA`**
+> (tables `PYTHIA|S|ApiKey` / `PYTHIA|S|DualLink`, functions
+> `C_DeployApolloPythiaApiKey` / `C_LinkDualApiKey` / `A_LinkDualApiKey`), and the
+> protocol is a **dual-Apollo pair** with a repeating ephemeral-secret round trip, not
+> a one-time activation. See
+> **[`organs/06-pythia-client-wire-in.md`](../organs/06-pythia-client-wire-in.md)**
+> for the current, shipped protocol. Kept here for historical lineage only.
+
 **This doc is authoritative** for every cross-component interface where the five
 handoffs must agree exactly. Each individual handoff flagged some of these as "open";
 here they are **settled**. **Where any individual handoff differs from this ICD**

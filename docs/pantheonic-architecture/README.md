@@ -22,14 +22,19 @@ Read in this order:
    sealed-vault crypto every automaton reuses, and the **Deploy Panel standard** (status readout +
    always-moving progress) every on-box deploy must implement.
 3. **[`identity/`](./identity)** — hub login + ownership verification, which appear *everywhere*: the
-   central AncientHub SSO service, the "Login with AncientHub in any consumer" recipe, the generic
-   Apollo-ownership verifier (`/apollo-verify`), and the dual-Apollo consumer-identity architecture.
-4. **[`organs/`](./organs)** — the shared constructor packages you consume (`@ancientpantheon/codex`,
-   `khronoton`, …): the package-structure blueprint, how to wire the engine in, the codex re-key
-   primitive, how to host the Codex in any consumer, and the **organ dependency contract**
-   (publishing organs + adopting a new organ version without breaking consumers).
-5. **[`patterns/`](./patterns)** — worked cross-repo *feature* references (e.g. the Pythia
-   consumer-key model). Read for example, not required to stand up a new site.
+   central AncientHub SSO service, the "Login with AncientHub in any consumer" recipe, and the
+   generic Apollo-ownership verifier (`/apollo-verify`).
+4. **[`organs/`](./organs)** — the shared constructor packages you consume — **all three now
+   finalized**: `@ancientpantheon/codex`, `@ancientpantheon/khronoton-core`, and
+   `@ancientpantheon/pythia-client`: the package-structure blueprint, how to wire the Khronoton
+   engine in, the codex re-key primitive, how to host the Codex in any consumer, **how to wire in
+   Pythia's connector protocol** (`06-pythia-client-wire-in.md` — gated/attributed chain access via
+   a dual-Apollo identity), and the **organ dependency contract** (publishing organs + adopting a
+   new organ version without breaking consumers).
+5. **[`patterns/`](./patterns)** — worked cross-repo *feature* references. Currently empty — its
+   former Pythia consumer-key doc turned out to describe a protocol that was never built; the
+   current, shipped protocol now lives in `organs/06-pythia-client-wire-in.md` instead (a wire-in
+   handoff, not a "worked example"). New cross-repo feature references land here as they're written.
 6. **[`archive/`](./archive)** — superseded or point-in-time docs kept for historical reference. Not
    current standards; consult only for lineage.
 
@@ -39,18 +44,20 @@ Read in this order:
 |---|---|---|
 | `design/` | width · tokens · header · admin layout · theming | the UI/UX standard |
 | `automaton/` | the blueprint · master-key sealed-vault · deploy-panel + progress standard | how to build an automaton |
-| `identity/` | SSO · consumer-login · Apollo verifier · dual-Apollo identity | login/verification everywhere |
-| `organs/` | package blueprint · khronoton wire-in · codex re-key · consumer integration · dependency contract | the shared packages |
-| `patterns/` | consumer-key model + interface-control doc | reference feature implementations |
-| `archive/` | superseded khronoton package draft · Codex v2 plan | historical / example |
+| `identity/` | SSO · consumer-login · Apollo verifier | login/verification everywhere |
+| `organs/` | package blueprint · khronoton wire-in · codex re-key · consumer integration · **pythia-client connector wire-in** · dependency contract | the shared packages — 3 organs, all finalized |
+| `patterns/` | *(empty — see §5 above)* | reference feature implementations |
+| `archive/` | superseded khronoton package draft · Codex v2 plan · 3 superseded Pythia consumer-key docs | historical / example |
 
 ## Reference implementations
 
 The standards point at real, running code so nobody builds from prose alone:
 
 - **Pythia** (`constructors/Pythia`) — the vanilla-JS reference for `design/` (sidebar admin +
-  standardized header), the constructor-service shape (`automaton/` §13), and the **deploy panel**
-  (`automaton/05` — status readout + always-moving progress).
+  standardized header), the constructor-service shape (`automaton/` §13), the **deploy panel**
+  (`automaton/05` — status readout + always-moving progress), and (as of `2.3.0`) the reference
+  implementation of the **connector protocol** itself — both the server side (`apps/pythia`) and the
+  published consumer SDK (`packages/pythia-client`, see `organs/06-pythia-client-wire-in.md`).
 - **Mnemosyne** (`automatons/Mnemosyne`) — the React reference for the automaton organs (Codex UI,
   sealed vault, on-box deploy). *(Mnemosyne predates this standard and still has drift — 3 widths, 2
   token sets — that it will align up to; treat Pythia as the clean `design/` reference.)*

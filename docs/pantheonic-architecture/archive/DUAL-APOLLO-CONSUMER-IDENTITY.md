@@ -1,5 +1,18 @@
 # Dual-Apollo Consumer Identity — architecture & decisions
 
+> **⚠ SUPERSEDED (2026-07-31).** This doc's **S/C role split** — S = an existing
+> API slot the owner registers, C = the *consumer's own separate* identity bound to
+> it — is asymmetric. What actually shipped is **symmetric**: one consumer deploys
+> and controls *both* halves of its own Standard/Smart Apollo pair as one identity;
+> there is no separate pre-existing "slot" a different consumer attaches to. The two
+> companion handoffs this doc names (`HANDOFF-pythia-dual-apollo.md`,
+> `HANDOFF-ouronetui-consumer-identity.md`) were never written under those names.
+> Caching/revocation direction (§5), the immutable-pairing idea (D2), and
+> signing-stays-local (D3) all correctly anticipated what shipped — only the S/C role
+> split and the on-chain naming are wrong. See
+> **[`organs/06-pythia-client-wire-in.md`](../organs/06-pythia-client-wire-in.md)**
+> for the current, shipped protocol. Kept here for historical lineage only.
+
 **Status:** design settled (this doc), implementation pending across three surfaces
 (see the two HANDOFF docs alongside this one).
 **Owner:** AncientHodler. **Date:** 2026-07-10.
