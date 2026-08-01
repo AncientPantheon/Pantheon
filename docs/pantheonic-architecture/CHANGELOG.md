@@ -2,6 +2,31 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-01 — `organs/06-pythia-client-wire-in.md` §2d corrected: deploy+link is a Codex concern, not a Pythia-connector onboarding wizard
+
+Real consumer implementation (Mnemosyne) surfaced that §2d's original wording — "use your existing
+chain-write path... the same way any other on-chain action already works" — was ambiguous enough to
+read as "build a self-contained onboarding flow in the Pythia-connector admin panel that generates
+a fresh Apollo pair and deploys+links it on-chain." That is the wrong shape: it duplicates
+account-management capability Codex already owns generically, and turned out to be genuinely
+higher-risk than it looked — an automated on-chain deploy/link path needs a working
+Apollo-curve/Schnorr Pact-transaction signer, a fundamentally different operation from this SDK's
+`ApolloSigner` (which only signs the short off-chain challenge message), and confirming whether
+that signer even exists is not optional.
+
+- **§2d rewritten**, explicit now: deploying + linking an Apollo pair (real STOA, steps 1-2 of the
+  §1b lifecycle) is a human-initiated, Codex-owned account-management action — the same shape as
+  creating any other on-chain account — done through Codex's own (generic, reusable, not
+  Pythia-specific) account flow. The Pythia-connector wiring's only job is: take a REFERENCE to an
+  already-deployed-and-linked pair as its configuration input, build an `ApolloSigner` that signs
+  for that referenced pair (resolving key material the same way the consumer's existing on-chain
+  signing already does), and wire `PythiaConnector`/`PythiaClient` per §2c. Step 3 (prove ownership
+  → Pythia's Cronoton activates) stays fully automatic — only the STOA-spending steps 1-2 are not.
+- **§2c gained a UI-default note**: an admin-editable `baseUrl` settings field should ship with the
+  real production URL (`https://pythia.ancientholdings.eu`) as its actual *saved* default, never
+  merely placeholder/hint text over an empty input — the two look identical at a glance, but an
+  unsaved empty field means no gateway is wired at all.
+
 ## 2026-08-01 — `automaton/05-deploy-panel-and-progress.md` — new §1e: fixed CONSTRUCTORS row order
 
 New canonical rule, added after Mnemosyne shipped Pythia as its third constructor

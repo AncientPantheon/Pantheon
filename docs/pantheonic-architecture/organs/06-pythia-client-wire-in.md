@@ -174,16 +174,61 @@ Poll it on your own cadence; there is no built-in timer (this package stays depe
 runtime-agnostic per its own established convention — see `docs/work/pythia-client-connector-sdk/
 design.md` Decision 1 in the Pythia repo for the full reasoning).
 
+**If you expose `baseUrl` as an admin-editable settings field** (e.g. so an operator can point at a
+non-production Pythia), make the real production URL
+(`https://pythia.ancientholdings.eu`) the field's actual **saved default** — not merely
+placeholder/hint text shown over an empty input. A placeholder looks identical to a real, active
+value at a glance, but an unsaved empty field means no gateway is wired at all; describe the field
+as "change this only if Pythia is deployed somewhere else," and ship it pre-filled/pre-saved with
+the real URL, not empty-with-a-hint.
+
 **Two independent processes proving each half** (e.g. the Standard half signed by one service, the
 Smart half by another) is supported — `recordProof` on Pythia's side pairs them regardless of order
 or which process calls first.
 
-### 2d · Deploy + link, once per new consumer
+### 2d · Deploy + link is a CODEX concern, not a Pythia-connector one — do not build an onboarding wizard for it
 
-Steps 1-2 of §1b (`C_DeployApolloPythiaApiKey` ×2, `C_LinkDualApiKey`) are direct Pact calls against
-StoaChain — not part of this SDK's surface (they happen once, at onboarding, not per-request). Use
-your existing chain-write path (Codex signing + `PythiaClient.send`) the same way any other on-chain
-action in your consumer already works.
+> **⚠ Confirmed mistake, corrected here (2026-08-01):** an earlier draft of this section left steps
+> 1-2 open-ended enough that a real consumer implementation read it as "build a self-contained
+> onboarding flow in your Pythia-connector admin panel that generates a fresh Apollo pair and
+> deploys+links it on-chain." **That is the wrong shape.** It duplicates account-management
+> capability Codex already owns generically, and — found the hard way — it is genuinely
+> higher-risk than it looks: an automated on-chain deploy/link flow needs a working
+> Apollo-curve/Schnorr Pact-transaction *signer*, which is a DIFFERENT operation from this SDK's
+> `ApolloSigner` (that only signs the short off-chain challenge message, §1c) and may not exist
+> anywhere in your stack — confirm this before ever wiring an automated on-chain path, do not
+> assume it.
+
+Steps 1-2 of §1b (`C_DeployApolloPythiaApiKey` ×2, `C_LinkDualApiKey`) are **key-management
+actions on an Apollo pair — the same kind of action as creating any other on-chain account your
+Codex already manages.** They belong wherever your consumer already lets a human generate, deploy,
+and manage its own on-chain accounts generically (Codex's own account UI/flow) — **not** a
+bespoke "Pythia connector onboarding" feature. Concretely:
+
+- **The human**, using Codex's existing (or to-be-built, but generically-Apollo-shaped, not
+  Pythia-specific) account management flow, generates a Standard + Smart Apollo pair, deploys both
+  halves on-chain, and links them (`C_DeployApolloPythiaApiKey` ×2 + `C_LinkDualApiKey` — real STOA,
+  a deliberate, admin-initiated action, same as any other on-chain account creation already is).
+- **The Pythia-connector wiring** (this handoff's actual scope) then does exactly three things,
+  none of which touch on-chain deploy/link:
+  1. Takes a **reference to that already-deployed-and-linked pair** as its only configuration input
+     — e.g. the Standard account's address, or however your Codex already lets one account be
+     selected/named among several. Not a "start onboarding" action; a plain settings field, the
+     same shape as picking which existing account to use for anything else.
+  2. Builds an `ApolloSigner` (§2b) that signs FOR that referenced pair, reading its key material
+     the same way your Codex already resolves any other account's signing key (mirror whatever
+     your existing on-chain transaction signing already does to resolve a keypair by
+     account/address — do not invent a second, parallel key-resolution path just for this).
+  3. Wires `PythiaConnector`/`PythiaClient` per §2c. **Step 3 of §1b (prove ownership → Pythia's
+     Cronoton activates the link) stays fully automatic** — that's what `ensureSecret()`/
+     `keyProvider()` already do, on whatever polling cadence you drive them from. Only steps 1-2
+     (deploy + link, the STOA-spending part) are the human's job, done through Codex, not this
+     wiring.
+
+If your consumer's Codex doesn't yet have a generic "create + deploy + link an Apollo pair" flow,
+build THAT (Codex-shaped, reusable for any future Apollo-account need) rather than a
+Pythia-connector-specific onboarding wizard — the distinction matters for exactly the reason this
+box exists.
 
 ---
 
