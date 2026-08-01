@@ -153,6 +153,30 @@ back to cwd. From `/app/apps/<app>/dist/...` the upward walk passes through
 layout. (The packages' `exports` maps typically don't expose `./package.json`, which is why this is
 a path walk rather than a `require.resolve`.)
 
+### 1e · Constructor row order — fixed, canonical, identical everywhere
+
+> **The CONSTRUCTORS group's rows appear in one fixed order, the same in every automaton's panel:
+> Pythia, Codex, Khronoton.** This is decided **here**, centrally — never left to an individual
+> automaton's own install order, wiring order, or alphabetical convenience.
+
+**Why centralize it:** order-by-install-order means two automatons that adopted the same three
+organs in a different sequence render two different-looking panels for what is supposed to be one
+uniform Pantheon surface — an operator moving between automatons' admin panels re-learns the layout
+each time for no reason. Fixing the order here, once, means every conformant panel reads identically
+regardless of that automaton's own history.
+
+- Current fixed order: **Pythia → Codex → Khronoton**.
+- A future organ's position in this order is added to this list explicitly, in this document, as
+  part of that organ's own wire-in handoff — not decided ad hoc by the first automaton to adopt it.
+- This governs **row order only**. It has no bearing on §1c's per-automaton adoption **policy**
+  (auto-adopt vs. pinned) or on `wired` — an automaton that hasn't yet adopted one of the three still
+  reserves its place in the order (or, if not shown at all for an unadopted organ, the remaining
+  rows keep this same relative order).
+
+**Reference implementation:** `automatons/Mnemosyne/lib/deploy/constructors.ts`'s
+`readConstructorsStatus()` — the `constructors` array is built in this exact order (Pythia, Codex,
+Khronoton), regardless of the order its `Promise.all` resolves the underlying probes in.
+
 ---
 
 ## 2 · The API contract (three endpoints)
@@ -343,6 +367,8 @@ An implementation is conformant when:
 
 - [ ] Version readout groups the **entity** and its **CONSTRUCTORS**, each row framed, with
       installed → available chips and independent per-probe degradation.
+- [ ] CONSTRUCTORS rows appear in the **fixed canonical order** (§1e): Pythia, Codex, Khronoton —
+      not the automaton's own install/wiring order.
 - [ ] Deploy readout shows **Mode · Live color · Loopback port · Container · Version** + the
       blue-green explainer.
 - [ ] The **constructor-adoption policy is explicit** (§1c), the deployer implements it, and

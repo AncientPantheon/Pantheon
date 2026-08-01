@@ -2,6 +2,16 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-01 — `automaton/05-deploy-panel-and-progress.md` — new §1e: fixed CONSTRUCTORS row order
+
+New canonical rule, added after Mnemosyne shipped Pythia as its third constructor
+(`organs/06-pythia-client-wire-in.md`) and its own panel's row order came up for review: the
+CONSTRUCTORS group's row order is now **fixed and centralized here**, not left to each automaton's
+own install/wiring order. Current order: **Pythia, Codex, Khronoton**. A future organ's position in
+this order gets decided in this document, as part of that organ's own wire-in handoff, so every
+conformant panel across every automaton reads identically. Conformance checklist (§8) updated to
+match. Mnemosyne's `lib/deploy/constructors.ts` is the reference implementation.
+
 ## 2026-07-31 — `organs/06-pythia-client-wire-in.md` (NEW) — the third organ, and 3 superseded docs archived
 
 Pythia's connector protocol shipped this session (`@ancientpantheon/pythia-client@2.3.0`), the last
