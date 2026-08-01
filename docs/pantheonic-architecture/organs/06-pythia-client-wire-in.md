@@ -230,6 +230,166 @@ build THAT (Codex-shaped, reusable for any future Apollo-account need) rather th
 Pythia-connector-specific onboarding wizard — the distinction matters for exactly the reason this
 box exists.
 
+### 2e · Consuming an already-active dual-link-key — the now-proven pattern
+
+> **Status (2026-08-01): proven, not speculative.** Everything in this section is driven by classes
+> that shipped and are exercised end-to-end by Pythia's own "Self Connector" admin panel — Pythia
+> deployed her own dual-Apollo pair, pasted the resulting dual-link-key into her own admin UI, and
+> watched this exact mechanism carry it from "not linked" to a live, auto-refreshing gated secret.
+> See `constructors/Pythia/docs/work/self-connector-dual-link/{design,plan}.md` for the full build
+> record. This supersedes any earlier, more speculative wording in this doc about how a consumer
+> that already holds a composite dual-link-key (rather than one lone Apollo account, §2c's shape)
+> should wire it in.
+
+> **Correction (2026-08-01, `self-connector-codex-signing` topic):** the paste-in mechanism above
+> (`DualLinkConnector` + a per-half `ApolloSigner`) is unchanged and still exactly how Pythia
+> consumes her own dual-link-key. What changed is WHERE her two `ApolloSigner`s get their key
+> material from, and it matters enough to call out explicitly: an earlier build of Pythia's own
+> reference implementation generated + sealed her Apollo keypairs in a bespoke local vault — that
+> was corrected after direct operator feedback. **Today Pythia never generates or holds her own
+> Apollo private key material anywhere in her own code.** Generation and on-chain activation happen
+> exclusively through Pythia's own embedded Codex admin tab (the same proper seed-word/confirmation
+> UX any Codex account gets — §2d's "generic account management" reasoning, not a Pythia-specific
+> flow). Ongoing unattended signing — the `ApolloSigner.sign()` call `DualLinkConnector` makes every
+> tick — is delegated to Codex's own `autoSignApolloChallenge` (`@ancientpantheon/codex/ouronet`,
+> v0.7.0+), which decrypts the account's key material from Codex's own already-sealed snapshot
+> (`codexStore.loadBackup()` + `codexStore.getOrCreateCodexPassword()`, both already held
+> server-side since the initial Codex setup) and signs — zero human interaction after that initial
+> setup. See `constructors/Pythia/docs/work/self-connector-codex-signing/{design,plan}.md` for the
+> full correction record.
+>
+> **This is Pythia's own chosen solution, not a requirement of this section's contract.** She uses
+> Codex because she happens to run one in-process already, and it already had a proper generation UI
+> and an unattended-signing primitive (`autoSignApolloChallenge`) built for exactly this. A consumer
+> WITHOUT an in-process Codex (e.g. Mnemosyne, unless it separately adopts Codex itself) still needs
+> SOME durable, server-side-accessible signing source of its own — `DualLinkConnector`/`ApolloSigner`
+> (§2b) do not require Codex specifically, only some real implementation of the `ApolloSigner`
+> interface, wherever that consumer's own key material actually lives.
+
+> **Correction (2026-08-01, `self-connector-panel-redesign` topic):** Step 4 below used to recommend
+> reading `status().standard.secret`/`.expiresAt` (and `.smart.*` as a fallback) directly for display —
+> **a per-half secret display.** Live use of Pythia's own reference implementation surfaced that this
+> is actively misleading: it renders as if two independent credentials exist, when Pythia's gate only
+> ever honors ONE — `DualLinkConnector.status()`'s own top-level `secret`/`expiresAt` (standard
+> preferred, smart fallback, `null` if neither half is active yet), the exact value `keyProvider()`
+> hands to `PythiaClient` in Step 3 above. **This was corrected once already, the hard way** — Pythia's
+> own admin panel briefly shipped exactly this wrong per-half pattern before the correction — so this
+> section now states the fix directly rather than leaving a future implementation (Mnemosyne's) to
+> discover the same confusion independently. Step 4 below reflects the corrected guidance.
+
+**Step 1 — obtain an active dual-link-key.** Unchanged from §2d above, just cross-referenced here,
+not rewritten: deploy both Apollo halves and link them via Codex's own account-management flow
+(`C_DeployApolloPythiaApiKey` ×2 + `C_LinkDualApiKey`, real STOA, human-initiated), then prove
+ownership of both halves — either by driving the raw `C_Link`/challenge-verify round trip yourself,
+or through Pythia's own browser Link-verify flow — until Pythia's Cronoton-signed
+`A_LinkDualApiKey` flips the pair active on-chain (§1b step 3). The result is a **composite
+`dual-link-key`** string: `<standard-apollo>|<smart-apollo>` (the literal `PYTHIA|T|DualLinks` table
+key, 325 chars, `|` as `DUAL_LINK_BAR`) — the one thing this section's wiring needs as input.
+
+**Step 2 — construct a `DualLinkConnector`.** Published from `@ancientpantheon/pythia-client` as of
+`2.5.0` (the package is `2.6.0` as of this writing). It takes the pasted key plus **one
+`ApolloSigner` per half** — built the same way §2b describes, bridged to wherever each half's key
+material actually lives:
+
+```ts
+import { DualLinkConnector } from "@ancientpantheon/pythia-client";
+
+const dualLink = new DualLinkConnector({
+  baseUrl: "https://pythia.ancientholdings.eu",
+  dualLinkKey: pastedDualLinkKey, // "<standard-apollo>|<smart-apollo>", 325 chars
+  standardSigner, // ApolloSigner for the standard half — §2b
+  smartSigner,    // ApolloSigner for the smart half — §2b
+  // fetchImpl / intervalMs / onError all optional; see the package README.
+});
+```
+
+A malformed key (wrong length, missing/misplaced `|`, a half not starting with the expected ₱/Π
+sigil) throws `PythiaConnectorValidationError` **synchronously, at construction time** — before any
+network call — via the package's own `splitDualLinkKey` (also directly importable, alongside the
+`DUAL_LINK_BAR` separator constant, if a consumer wants to validate or assemble a key string before
+handing it to `DualLinkConnector`).
+
+**Step 3 — wire `keyProvider()` into `PythiaClient`.** Exactly the same shape as §2c's single-account
+`PythiaConnector`, just off the dual-link instance instead:
+
+```ts
+import { PythiaClient } from "@ancientpantheon/pythia-client";
+
+const client = new PythiaClient({
+  baseUrl: "https://pythia.ancientholdings.eu",
+  pythiaKey: dualLink.keyProvider(), // resolved fresh per request, no manual refresh loop
+});
+
+const gatedRead = await client.read({ code: "(coin.get-balance \"k:abc\")" });
+```
+
+Internally, `DualLinkConnector` holds one `PythiaConnector` per half, ticks both independently with
+per-half error isolation (one half's signer/network failure never blocks the other's), and reports a
+single `secret`/`expiresAt` via `dualLink.status()` — whichever half is active first, since Pythia's
+gate never cares which half issued the secret. `status()` also carries each half's own state
+separately as `status().standard` / `status().smart` (each `{status: "pending"}` or
+`{status: "active", secret, expiresAt}`) — **that per-half shape happens to carry its own `secret`
+too (unchanged SDK internals, out of scope for this doc's UI guidance), but step 4 below reads only
+the top-level `secret`/`expiresAt` for display — never the per-half ones.** The per-half shape exists
+for diagnosing which half is currently serving the credential, not for a second display of it.
+
+**Step 4 — for any UI a consumer builds around this: ONE consolidated masked secret + countdown,
+never a per-half display.** Never render the raw ephemeral secret, and — the point this section now
+states explicitly, after correcting a real instance of getting it wrong (see the correction callout
+above) — **never render TWO secrets, one per half.** Only `dualLink.status()`'s own top-level
+`secret`/`expiresAt` (§1 above: standard preferred, smart fallback, both `null` if neither half is
+active) is the value that ever reaches `x-pythia-key` for a real gated request; a per-half secret
+display implies two independent credentials exist when the gate only ever honors one, which is
+actively misleading, not just unpolished. `@ancientpantheon/pythia-client` ships a tiny, pure
+`maskSecret(secret)` helper (published `2.6.0`) that returns
+`` `${secret.slice(0, 7)}...${secret.slice(-7)}` `` for any secret of realistic length, and the
+string unchanged for anything under 14 characters (never produces overlapping/negative-slice garbage
+on a short input) — so a consumer's admin UI doesn't have to reimplement this slicing itself:
+
+```ts
+import { maskSecret } from "@ancientpantheon/pythia-client";
+
+const st = dualLink.status(); // top-level secret/expiresAt — the ONE consolidated value
+if (st.secret) {
+  const display = `${maskSecret(st.secret)} — expires in ${formatCountdown(st.expiresAt - Date.now())}`;
+}
+```
+
+(`formatCountdown` is a small, un-published, UI-local helper — not part of the SDK — that turns a
+millisecond delta into e.g. `"23h 58m"`/`"42m 10s"`/`"expired"`; write your own the same shape as the
+reference implementation below, or the countdown text in a UI you build off this.)
+
+Per-half state (`st.standard.status`/`st.smart.status`, each `"pending"` or `"active"`) is still
+worth showing **separately, as diagnostic state only** — e.g. a small chip per half, so a struggling
+half (one whose signer or network keeps failing) stays visible even though the gate is still served
+fine by the other half — but that per-half display must never carry a `secret` or `expiresAt` value
+of its own. State only, never a second secret.
+
+**Concrete, working reference implementation:** Pythia's own now-redesigned Self Connector admin
+panel — `constructors/Pythia/apps/pythia/public/admin.html` (the `data-view="self-connector"`
+section, `.deploy-card`-framed) and `constructors/Pythia/apps/pythia/public/admin.js`
+(`selfConnectorHalfView`, `formatCountdown`, `renderSelfConnector`, `wireSelfConnector`) — does
+exactly this corrected pattern. Server-side, `apps/pythia/src/admin/routes.ts`'s
+`SelfConnectorStatus` type mirrors the consolidated shape directly: top-level
+`maskedSecret: string | null` / `expiresAt: number | null` (computed once, server-side, from
+`DualLinkConnector.status()`'s own top-level `secret`/`expiresAt` via `maskSecret` — masked before it
+ever reaches the browser, mirroring this doc's own no-raw-secret-over-the-wire posture throughout),
+while `SelfConnectorHalfView` (`status.standard`/`status.smart`) carries **only**
+`{ state: "not-linked" | "pending" | "active" }` — no secret data at the per-half level at all. The
+browser renders this as: two `.deploy-row` diagnostic chips (one per half, state text only — `"Not
+linked"` / `"Pending"` / `"Active"`), plus exactly ONE `.ttl-card` (shown only when `maskedSecret` is
+non-null) holding the single masked secret, a depleting horizontal timer bar, and the text countdown
+— all three re-rendered once a second off the last fetched status (no extra network call per tick). A
+consumer's own UI does not have to mask server-side the way Pythia's does (that choice reflects
+Pythia's own no-raw-secret-over-the-wire convention, not a hard requirement of the SDK), and does not
+have to build a timer bar (Pythia's is the first one in this codebase, purely a visual nicety) — but
+the ONE-consolidated-secret shape itself is not optional: it is the corrected, recommended starting
+point for any UI built around either `PythiaConnector` (§2c) or `DualLinkConnector` (this section),
+and a per-half secret display is the one pattern this reference implementation explicitly does NOT
+use, on purpose, having already built and then corrected it once.
+See `constructors/Pythia/docs/work/self-connector-panel-redesign/{design,plan}.md` for the full
+correction record (Topic 4, following Topics 2 and 3 referenced above).
+
 ---
 
 ## 3 · Becoming the third row in the deploy panel
@@ -254,16 +414,39 @@ row (alongside Codex and Khronoton) in your own panel:
 ## 4 · Reference implementation
 
 - **Package source:** `constructors/Pythia/packages/pythia-client/src/{connector,connectorErrors,
-  secretStorage}.ts` — the SDK this handoff describes.
+  secretStorage}.ts` — the single-account SDK (§2c). `constructors/Pythia/packages/pythia-client/
+  src/{dualLinkConnector,dualLinkKey,maskSecret}.ts` — the dual-link-key SDK (§2e): `DualLinkConnector`,
+  `splitDualLinkKey`/`DUAL_LINK_BAR`, and `maskSecret`.
 - **Server-side protocol** (deployed with the Pythia service, NOT part of the npm package):
   `constructors/Pythia/apps/pythia/src/connectors/auth/*`, `constructors/Pythia/apps/pythia/src/
   automaton/khronoton/dualLinkActivateResolver.ts`, `constructors/Pythia/apps/pythia/src/routes/
   connectorAuth.ts`.
+- **§2e's own reference implementation** (Pythia as her own dual-link-key consumer):
+  `constructors/Pythia/apps/pythia/src/automaton/{selfApollo,selfConnectorLoop,codexApolloSigner}.ts`
+  (server-side — `SelfApolloVault.setDualLinkKey` validates a pasted key against Codex's own
+  `ouroAccounts` snapshot via `codexApolloSigner.ts`'s `codexHoldsAccount`; `SelfConnectorLoop` wraps
+  `DualLinkConnector`; `codexApolloSigner.ts`'s `createCodexApolloSigner` is the `ApolloSigner`
+  implementation that delegates every `sign()` call to Codex's `autoSignApolloChallenge`),
+  `constructors/Pythia/apps/pythia/public/{admin.html,admin.js}` (browser-side — the paste-in Link
+  control + the ONE consolidated masked-secret/timer-bar/countdown display, plus two per-half
+  diagnostic state chips; generation itself happens in this same admin page's separate, pre-existing
+  Codex tab, not here).
 - **Build rationale + full design decisions:** `constructors/Pythia/docs/work/
   pythia-connector-protocol/design.md` (umbrella), `constructors/Pythia/docs/work/
   connector-auth-core/`, `constructors/Pythia/docs/work/connector-activation-resolver/`,
   `constructors/Pythia/docs/work/pythia-client-connector-sdk/` (`design.md`/`plan.md`/`review.md`
-  each).
+  each — the original `PythiaConnector`/`ApolloSigner` SDK), `constructors/Pythia/docs/work/
+  pythia-dual-link-connector/design.md` (umbrella) → `constructors/Pythia/docs/work/
+  pythia-client-dual-link-sdk/design.md` (Topic 1 — `DualLinkConnector`/`splitDualLinkKey`),
+  `constructors/Pythia/docs/work/self-connector-dual-link/{design,plan}.md` (Topic 2 — Pythia
+  wiring herself up as the first proof, §2e's reference implementation),
+  `constructors/Pythia/docs/work/self-connector-codex-signing/{design,plan}.md` (Topic 3 —
+  correcting §2e's reference implementation from a bespoke local vault to Codex-backed generation +
+  unattended signing, after direct operator feedback), and `constructors/Pythia/docs/work/
+  self-connector-panel-redesign/{design,plan}.md` (Topic 4 — correcting §2e's reference
+  implementation, and this doc's own UI guidance, from a per-half masked-secret display to the ONE
+  consolidated top-level `secret`/`expiresAt` display, plus a visual redesign to the codebase's
+  established framed-card language).
 
 ---
 

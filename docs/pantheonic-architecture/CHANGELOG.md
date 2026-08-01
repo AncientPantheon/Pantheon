@@ -2,6 +2,83 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-01 — `organs/06-pythia-client-wire-in.md` §2e corrected: ONE consolidated secret, never one per half
+
+Follow-on correction to the `self-connector-codex-signing` entry directly below, triggered by live
+user feedback after Pythia linked her own dual-Apollo pair for the first time in her own admin panel:
+the panel showed TWO masked ephemeral secrets, one per Apollo half, which reads as if two independent
+credentials exist — when `DualLinkConnector.status()` already computes a single deduped
+`secret`/`expiresAt` (standard preferred, smart fallback) and that is the only value Pythia's gate
+ever honors. Shipped as `self-connector-panel-redesign`: `SelfConnectorLoop`/`SelfConnectorStatus`
+now surface that one consolidated value at the top level; the per-half view carries only diagnostic
+`state`, never a secret; and Pythia's own Self Connector admin panel was rebuilt into the codebase's
+established framed-card language (`.deploy-card`/`.deploy-row`) with exactly one masked secret, one
+depleting timer bar, and one text countdown for the whole linked pair, plus two per-half state chips.
+
+- **§2e gained a second correction callout**, after the Codex-signing one: Step 4's UI guidance —
+  which previously read `status().standard.secret`/`.smart.secret` for display, a per-half
+  pattern — is corrected to read only `dualLink.status()`'s own top-level `secret`/`expiresAt`.
+  Per-half state remains useful to show separately as a diagnostic chip (so a struggling half stays
+  visible), but a per-half *secret* display is now explicitly called out as the wrong pattern this
+  session already built once and had to correct, so a future implementation (Mnemosyne's) doesn't
+  repeat it. The paragraph directly above Step 4, which previously said per-half state "is what step
+  4 reads for display," is corrected to match. Step 4's worked example and its "concrete, working
+  reference implementation" paragraph are rewritten to cite the real shipped field names
+  (`SelfConnectorStatus.maskedSecret`/`.expiresAt` top-level, `SelfConnectorHalfView.state` per half)
+  and the redesigned admin panel's actual structure (`.deploy-row` diagnostic chips + one `.ttl-card`
+  holding the secret/bar/countdown).
+- **§4 (Reference implementation) extended** with the new design docs
+  (`docs/work/self-connector-panel-redesign/{design,plan}.md`, Topic 4) and an updated description of
+  the admin-panel reference implementation's browser-side shape.
+
+## 2026-08-01 — `organs/06-pythia-client-wire-in.md` §2e corrected: Codex-backed generation + unattended signing, not a bespoke local vault
+
+Follow-on correction to the `self-connector-dual-link` entry directly below, triggered by direct
+operator feedback after using the deployed panel: Pythia's own reference implementation used to
+generate + seal her Apollo keypairs in a bespoke local vault (`SelfApolloVault.ensureGenerated()`),
+indistinguishable from genuinely sensitive secrets in her Security panel's sealed-credentials list.
+Shipped as `self-connector-codex-signing`: Pythia never generates or holds her own Apollo private
+key material anywhere in her own code anymore — generation + on-chain activation happen exclusively
+through her own embedded Codex admin tab, and ongoing unattended signing is delegated to Codex's own
+`autoSignApolloChallenge` (`@ancientpantheon/codex/ouronet`, v0.7.0+), decrypting from Codex's
+already-sealed snapshot server-side, zero human interaction after initial Codex setup.
+
+- **§2e gained a correction callout**, right after the original "proven, not speculative" status
+  note: the paste-in mechanism itself (`DualLinkConnector` + a per-half `ApolloSigner`) is
+  unchanged; only WHERE the two `ApolloSigner`s source their key material changed, from a local
+  vault to `codexApolloSigner.ts`'s `createCodexApolloSigner`/`codexHoldsAccount`, backed by Codex's
+  `autoSignApolloChallenge`. Explicit note added: this is Pythia's OWN chosen solution because she
+  happens to run a Codex in-process — a consumer without one (e.g. Mnemosyne, unless it adopts Codex
+  itself) still needs SOME durable, server-side-accessible signing source of its own; this doc's
+  `DualLinkConnector`/`ApolloSigner` contract doesn't require Codex specifically, only some real
+  `ApolloSigner` implementation, wherever a consumer's own key material actually lives.
+- **§4 (Reference implementation) updated**: the `selfApollo.ts`/`selfConnectorLoop.ts` file list
+  gains `codexApolloSigner.ts`, with `SelfApolloVault.setDualLinkKey`'s validation and
+  `createCodexApolloSigner`'s signing delegation both called out by name; the design-doc list gains
+  `docs/work/self-connector-codex-signing/{design,plan}.md` (Topic 3).
+
+## 2026-08-01 — `organs/06-pythia-client-wire-in.md` — new §2e: the now-proven dual-link-key consumption pattern
+
+Pythia shipped the `self-connector-dual-link` topic (`@ancientpantheon/pythia-client@2.6.0`):
+Pythia deployed her own dual-Apollo pair, pasted the resulting dual-link-key into her own admin
+panel, and proved — end-to-end, live — the exact mechanism any future consumer (Mnemosyne first)
+needs to consume an already-active dual-link-key. This handoff gains the section documenting it.
+
+- **New §2e — "Consuming an already-active dual-link-key — the now-proven pattern."** Covers, in
+  order: (1) obtaining an active dual-link-key (cross-references §2d unchanged — deploy + link stays
+  a Codex concern); (2) constructing a `DualLinkConnector` (published `2.5.0`) with the pasted key
+  plus one `ApolloSigner` per half; (3) wiring `dualLink.keyProvider()` into `PythiaClient`, same
+  shape as §2c's single-account connector; (4) for any UI built around this, using the published
+  `maskSecret()` helper (`2.6.0`) plus `status().standard.expiresAt`/`.smart.expiresAt` for a
+  masked-secret-plus-countdown display — citing Pythia's own Self Connector admin panel
+  (`apps/pythia/public/admin.{html,js}`, this topic) as the concrete, working reference
+  implementation of exactly this pattern.
+- **§4 (Reference implementation) extended** with the dual-link-key SDK source
+  (`dualLinkConnector.ts`/`dualLinkKey.ts`/`maskSecret.ts`), §2e's own server+browser reference
+  implementation (`selfApollo.ts`/`selfConnectorLoop.ts`/`admin.{html,js}`), and the two new design
+  docs (`docs/work/pythia-dual-link-connector/design.md` umbrella, `docs/work/
+  pythia-client-dual-link-sdk/design.md`, `docs/work/self-connector-dual-link/{design,plan}.md`).
+
 ## 2026-08-01 — `organs/06-pythia-client-wire-in.md` §2d corrected: deploy+link is a Codex concern, not a Pythia-connector onboarding wizard
 
 Real consumer implementation (Mnemosyne) surfaced that §2d's original wording — "use your existing
