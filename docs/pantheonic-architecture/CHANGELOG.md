@@ -2,6 +2,15 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-03 — `organs/05-khronoton-engine-wire-in.md`: re-derive seed accounts seedType-aware
+
+Learned live in Pythia: a `KeyResolver` that re-derives an HD-wallet seed account must branch on the
+seed's `seedType` (koala SLIP-10 vs chainweaver/eckowallet BIP32-Ed25519 WASM) to match how Codex
+recorded the pubkey — Pythia used the koala path for every seed, so a chainweaver operator seed
+re-derived a different key and the resolver refused to sign. Added a callout under the `KeyResolver`
+seam (both derivations yield password-independent pubkeys; keep the wrong-key guard; pure/ouro
+accounts skip re-derivation). Reference: `keyResolver.ts`'s `fromSeedAccount` + `keyResolver.test.ts`.
+
 ## 2026-08-02 — `organs/05-khronoton-engine-wire-in.md`: filter codex accounts to Kadena keys when backing `KeyResolver`/the signer picker
 
 Learned live in Pythia: an operator codex holds mixed-curve accounts (Kadena/DALOS 64-hex keys
