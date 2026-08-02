@@ -277,6 +277,36 @@ box exists.
 > section now states the fix directly rather than leaving a future implementation (Mnemosyne's) to
 > discover the same confusion independently. Step 4 below reflects the corrected guidance.
 
+> **Correction (2026-08-02, `self-connector-boot-tick-and-layout` topic):** two more corrections
+> from direct operator use of the reference implementation, both real bugs rather than polish:
+>
+> 1. **A consumer's own periodic refresh loop must fire an immediate tick on `start()`, not rely on
+>    `setInterval` alone.** `setInterval(fn, intervalMs)` fires its FIRST call only after a full
+>    `intervalMs` elapses — for Pythia's own `SelfConnectorLoop` that's 24h. A dual-link-key linked
+>    in a PRIOR process lifetime is sealed and survives a restart, but a loop's own cached per-half
+>    status starts every fresh boot at `"not-linked"` regardless — so without an immediate tick,
+>    EVERY redeploy left the admin looking at a false "not-linked" for up to a day, even though the
+>    key was still perfectly good, with no actual action needed to fix it (the operator's first
+>    instinct — "do I have to link it again?" — was the wrong diagnosis; the fix was in the loop,
+>    not a re-paste). `SelfConnectorLoop.start()` now fires `tick()` once immediately
+>    (fire-and-forget, not awaited — a slow/unreachable chain read must never delay the caller's own
+>    boot), in addition to starting the periodic interval. Any consumer building its own scheduled
+>    refresh loop around `DualLinkConnector`/`PythiaConnector` (rather than the request-time
+>    `keyProvider()` pattern in Step 3 below, which needs no loop at all) should do the same.
+> 2. **The reference UI's per-half zones are NOT `.deploy-row`** (a later correction to Step 4's own
+>    earlier wording, in this same doc, below) **— they're a distinct, purpose-built `.acct-card`.**
+>    A single-line `.deploy-row` cannot safely hold a 162-char, unbreakable (no spaces) Apollo
+>    account address next to a state chip: without explicit `overflow`/`text-overflow` handling the
+>    address bleeds out past its shrunk flex box and visually collides with the chip. `.acct-card` is
+>    a bordered zone with the label + chip on their own top line and the address on its own line
+>    below, ellipsis-truncated (`white-space: nowrap; overflow: hidden; text-overflow: ellipsis`) to
+>    fit whatever width is actually available — the general lesson: never put a long, unbreakable
+>    identifier string in a plain single-line flex row next to another element without truncation
+>    handling, regardless of which specific CSS classes a UI ends up using.
+>
+> See `constructors/Pythia/docs/work/self-connector-boot-tick-and-layout/design.md` for the full
+> record.
+
 **Step 1 — obtain an active dual-link-key.** Unchanged from §2d above, just cross-referenced here,
 not rewritten: deploy both Apollo halves and link them via Codex's own account-management flow
 (`C_DeployApolloPythiaApiKey` ×2 + `C_LinkDualApiKey`, real STOA, human-initiated), then prove
@@ -356,8 +386,12 @@ if (st.secret) {
 ```
 
 (`formatCountdown` is a small, un-published, UI-local helper — not part of the SDK — that turns a
-millisecond delta into e.g. `"23h 58m"`/`"42m 10s"`/`"expired"`; write your own the same shape as the
-reference implementation below, or the countdown text in a UI you build off this.)
+millisecond delta into e.g. `"23h 58m 41s"`/`"42m 10s"`/`"17s"`/`"expired"`. **Always include seconds,
+even alongside hours** (a correction from live use, `self-connector-boot-tick-and-layout` topic): an
+earlier version dropped seconds once an hour or more remained, showing e.g. just `"23h 58m"` — which
+only visibly changes once a minute, reading as static/frozen rather than live. A countdown that
+visibly ticks down every second is the operator's actual at-a-glance proof the loop behind it is
+alive, not stale. Write your own the same shape as the reference implementation below.)
 
 Per-half state (`st.standard.status`/`st.smart.status`, each `"pending"` or `"active"`) is still
 worth showing **separately, as diagnostic state only** — e.g. a small chip per half, so a struggling
@@ -376,9 +410,13 @@ exactly this corrected pattern. Server-side, `apps/pythia/src/admin/routes.ts`'s
 ever reaches the browser, mirroring this doc's own no-raw-secret-over-the-wire posture throughout),
 while `SelfConnectorHalfView` (`status.standard`/`status.smart`) carries **only**
 `{ state: "not-linked" | "pending" | "active" }` — no secret data at the per-half level at all. The
-browser renders this as: two `.deploy-row` diagnostic chips (one per half, state text only — `"Not
-linked"` / `"Pending"` / `"Active"`), plus exactly ONE `.ttl-card` (shown only when `maskedSecret` is
-non-null) holding the single masked secret, a depleting horizontal timer bar, and the text countdown
+browser renders this as: two `.acct-card` zones (one per half — a bordered box with the label + state
+chip on their own top line and the account address on its own line below, ellipsis-truncated to fit;
+NOT a single-line `.deploy-row`, which can't safely hold an unbreakable 162-char address next to a
+chip without the two visually colliding — a real bug this reference implementation shipped once and
+corrected, see the correction callout above), state text only — `"Not linked"` / `"Pending"` /
+`"Active"` — plus exactly ONE `.ttl-card` (shown only when `maskedSecret` is non-null) holding the
+single masked secret, a depleting horizontal timer bar, and the text countdown
 — all three re-rendered once a second off the last fetched status (no extra network call per tick). A
 consumer's own UI does not have to mask server-side the way Pythia's does (that choice reflects
 Pythia's own no-raw-secret-over-the-wire convention, not a hard requirement of the SDK), and does not
@@ -442,11 +480,14 @@ row (alongside Codex and Khronoton) in your own panel:
   wiring herself up as the first proof, §2e's reference implementation),
   `constructors/Pythia/docs/work/self-connector-codex-signing/{design,plan}.md` (Topic 3 —
   correcting §2e's reference implementation from a bespoke local vault to Codex-backed generation +
-  unattended signing, after direct operator feedback), and `constructors/Pythia/docs/work/
+  unattended signing, after direct operator feedback), `constructors/Pythia/docs/work/
   self-connector-panel-redesign/{design,plan}.md` (Topic 4 — correcting §2e's reference
   implementation, and this doc's own UI guidance, from a per-half masked-secret display to the ONE
   consolidated top-level `secret`/`expiresAt` display, plus a visual redesign to the codebase's
-  established framed-card language).
+  established framed-card language), and `constructors/Pythia/docs/work/
+  self-connector-boot-tick-and-layout/design.md` (Topic 5 — two more live-use corrections: an
+  immediate tick on `start()` so a redeploy never shows a false "not-linked" for an already-linked
+  pair, and the `.acct-card` account-zone layout replacing `.deploy-row` for the reasons above).
 
 ---
 

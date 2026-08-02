@@ -2,6 +2,45 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-02 — new `automaton/05-deploy-panel-and-progress.md` §10: local state files vs. the blue-green handoff race
+
+A genuine production bug, confirmed live: Pythia's Pyth ledger admin "Nuke" button was silently
+undone by an in-flight redeploy. Root cause, generalized: any local file a container mutates at
+runtime (read at boot, written on an interval/shutdown) can be resurrected by an INCOMING
+container's blue-green health-check window — it boots and loads the file into memory up to ~60s
+*before* traffic cuts over (§1b/§3), so a reset landing on the still-live OUTGOING container in
+that window is invisible to the already-booted incoming one, whose own next write silently
+clobbers the reset. Shipped as `pyth-ledger-nuke-race`: `PythLedger` now tracks a `generation`
+counter bumped only by `nuke()`; every `persist()` first checks the on-disk generation and
+self-heals (reloads) instead of writing a stale snapshot over a newer reset it doesn't know about.
+
+- **New §10** documents the generalized pattern (not Pythia-specific) so a future automaton with
+  its own locally-persisted runtime state applies the generation-guard from the start, instead of
+  discovering the same race independently.
+
+## 2026-08-02 — `organs/06-pythia-client-wire-in.md` §2e gained a third correction callout: immediate tick on `start()`, and the `.acct-card` layout fix
+
+Two more live-use corrections, shipped as `self-connector-boot-tick-and-layout`, following directly
+from the `self-connector-panel-redesign` entry below:
+
+- **A consumer's own periodic refresh loop must fire an immediate tick on `start()`.** A bare
+  `setInterval` only fires its first call after a full `intervalMs` elapses (24h for Pythia's own
+  `SelfConnectorLoop`) — so every redeploy showed a false "not-linked" for an already-linked,
+  perfectly valid pair for up to a day. `start()` now fires one immediate `tick()`
+  (fire-and-forget) in addition to the periodic one. §2e's Step-adjacent correction callout states
+  this as a general rule for any consumer building its own scheduled loop, not just Pythia's class.
+- **The reference UI's per-half zones are `.acct-card`, not `.deploy-row`** — a single-line flex row
+  can't safely hold an unbreakable 162-char Apollo address next to a state chip without explicit
+  truncation handling; the address bled out and visually collided with the chip. `.acct-card` is a
+  bordered zone with the label + chip on their own top line and the ellipsis-truncated address
+  below. §2e's worked example and "concrete, working reference implementation" paragraph are
+  corrected to name the right class.
+- The `formatCountdown` example is corrected to always show seconds (`"23h 58m 41s"`, not
+  `"23h 58m"`) — a countdown that only visibly changes once a minute reads as static; always
+  showing seconds is what makes it read as genuinely live.
+- **§4 (Reference implementation) extended** with the new design doc
+  (`docs/work/self-connector-boot-tick-and-layout/design.md`, Topic 5).
+
 ## 2026-08-01 — `organs/06-pythia-client-wire-in.md` §2e corrected: ONE consolidated secret, never one per half
 
 Follow-on correction to the `self-connector-codex-signing` entry directly below, triggered by live

@@ -399,3 +399,40 @@ An implementation is conformant when:
 | The three endpoints + SSE tail | `apps/pythia/src/routes/adminDeploy.ts` |
 | Version + constructor probes | `apps/pythia/src/admin/{versionInfo,organVersions}.ts` |
 | Panel markup / progress logic / styles | `apps/pythia/public/{admin.html,admin.js,styles.css}` |
+
+---
+
+## 10 · Local state files during the blue-green handoff — the generation-guard pattern
+
+**Status (2026-08-02): confirmed production bug, fixed and shipped.** Any local file an automaton
+mutates at runtime — a counter, a ledger, a cache — that is read at boot and written on an interval
+or on shutdown is vulnerable to a real race across a blue-green swap, **even though the swap itself
+is correct** (§1b, §3): step 4's health-check window (§3, up to ~60s of `/healthz` polling) starts
+the INCOMING container — which boots and loads that local file into its own process memory —
+*before* traffic is cut over to it (§1b's `Live color` only flips after the health check passes).
+Any admin action that resets that file (Pythia's case: the Pyth ledger's admin "Nuke" button) lands
+on whichever container is *still* live at that instant — correctly clearing its memory and the file
+— but the incoming container's already-booted, now-stale in-memory copy has no way to know the file
+changed underneath it. Once traffic cuts over, its own next write (a served request, its own
+periodic flush timer, or its `SIGTERM` shutdown flush) silently overwrites the just-reset file with
+its stale snapshot, resurrecting data an admin believed was gone.
+
+**The fix, generalized:** give the persisted file a monotonic `generation` counter, bumped only by
+the reset action. Before every write, first peek the ON-DISK generation (a cheap extra read of a
+small local file). If it's ahead of what this process last knew, another process has reset the
+state since this one last synced — reload the newer on-disk truth instead of writing this process's
+stale snapshot over it, discarding (not merging) whatever this process itself accumulated since
+going stale. This is a deliberate, accepted trade-off: losing a few seconds of one process's own
+activity during a genuinely rare race window beats silently resurrecting a whole reset history
+indefinitely.
+
+Any future automaton with its OWN locally-persisted, runtime-mutated state (not just Pythia's Pyth
+ledger) should apply the same pattern rather than discover this race independently — the underlying
+cause (an incoming container's boot-time read racing a reset landing on the outgoing container) is
+generic to this repo's blue-green deploy shape (§1b), not specific to any one automaton's data.
+
+**Reference implementation:** `constructors/Pythia/apps/pythia/src/pyth/ledger.ts`
+(`PythLedger.nuke()`/`persist()`/`snapshot()`) — see
+`constructors/Pythia/docs/work/pyth-ledger-nuke-race/design.md` for the full incident record,
+including the test that reproduces the exact race (`ledger.test.ts`'s "nuke/deploy generation race"
+describe block) before demonstrating the fix.
