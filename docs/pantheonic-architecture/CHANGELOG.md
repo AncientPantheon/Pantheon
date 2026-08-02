@@ -2,6 +2,17 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-02 — `organs/05-khronoton-engine-wire-in.md`: filter codex accounts to Kadena keys when backing `KeyResolver`/the signer picker
+
+Learned live in Pythia: an operator codex holds mixed-curve accounts (Kadena/DALOS 64-hex keys
+alongside Apollo `<len>.<xy>` keys), and a consumer's `KeyResolver`/`SignerSource` implementation
+must filter to Kadena keys only — otherwise Apollo keys leak into Khronoton's Builder signing-key
+picker (`DALOS.GAS_PAYER`). Added a callout under the `KeyResolver` seam documenting that the robust
+filter is on the **key format itself** (`/^[0-9a-fA-F]{64}$/`), NOT on Codex's `originCurve`
+metadata — Pythia first tried the metadata filter and it didn't hold in the field (real Apollo
+accounts don't reliably set it). Khronoton-core itself stays curve-agnostic; the filtering is the
+consumer's job because only the consumer knows it wants Kadena keys.
+
 ## 2026-08-02 — new `automaton/05-deploy-panel-and-progress.md` §10: local state files vs. the blue-green handoff race
 
 A genuine production bug, confirmed live: Pythia's Pyth ledger admin "Nuke" button was silently
