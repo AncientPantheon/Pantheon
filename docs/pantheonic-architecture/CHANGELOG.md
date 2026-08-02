@@ -2,14 +2,18 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
-## 2026-08-03 — `organs/05-khronoton-engine-wire-in.md`: re-derive seed accounts seedType-aware
+## 2026-08-03 — `organs/05-khronoton-engine-wire-in.md`: DELEGATE key resolution to Codex, don't hand-roll a KeyResolver
 
-Learned live in Pythia: a `KeyResolver` that re-derives an HD-wallet seed account must branch on the
-seed's `seedType` (koala SLIP-10 vs chainweaver/eckowallet BIP32-Ed25519 WASM) to match how Codex
-recorded the pubkey — Pythia used the koala path for every seed, so a chainweaver operator seed
-re-derived a different key and the resolver refused to sign. Added a callout under the `KeyResolver`
-seam (both derivations yield password-independent pubkeys; keep the wrong-key guard; pure/ouro
-accounts skip re-derivation). Reference: `keyResolver.ts`'s `fromSeedAccount` + `keyResolver.test.ts`.
+Refined (same day) after establishing the root cause: the seedType signing bug arose because each
+Khronoton consumer HAND-ROLLED its `KeyResolver` (re-deriving a subset of Codex's derivation, koala
+only) instead of delegating to Codex's own complete, seedType-aware resolver — which the embedded
+Codex owns and the published package exports (`createHeadlessCodexResolver`). The Hub's monolithic
+Khronoton never hit it (it used Codex's full resolver); the pluggable `KeyResolver` seam invited
+partial reimplementations (Mnemosyne's, then Pythia's copy). The callout now leads with **delegate to
+Codex's headless resolver**; the seedType-aware hand-roll (koala vs chainweaver/eckowallet, both
+password-independent pubkeys, keep the wrong-key guard) is documented only as the interim fallback.
+Flags that Mnemosyne carries the identical latent bug and should adopt the delegation too. Reference:
+`keyResolver.ts`'s `fromSeedAccount` + `keyResolver.test.ts` (interim); target is delegation.
 
 ## 2026-08-02 — `organs/05-khronoton-engine-wire-in.md`: filter codex accounts to Kadena keys when backing `KeyResolver`/the signer picker
 
