@@ -13,6 +13,19 @@ in memory behind an unchanging URL (addressable at Tier-1/Tier-2 but opaque at T
 in Pythia, which now implements it (`VIEW_SUBTABS` + `applySubtab` in `public/admin.js`); landing
 Tier-1/Tier-2 already conformed. Updated §3.7, §5.1, and the §7 conformance checklist.
 
+## 2026-08-03 — `organs/05` §6.1–6.3: server-resolver setup completeness + UI/routing requirements
+
+Extended the server-resolver rules (§6) with the requirements learned live in Pythia's Khronoton admin:
+**§6.1 setup completeness** — an automaton declares a fixed set of server resolvers and the setup is
+complete only when every one is consumed by exactly one cronoton; the admin needs a resolver ROSTER
+showing which are consumed. **§6.2 UI for a server-resolver cronoton** — mark it as special (badge); an
+evented/trigger-only row must show Schedule = "Evented" (not the stored schedule), Next Fire =
+"Evented"/"—", and DISABLE the schedule controls in the edit form; a system cronoton must be deletable
+with a warning, not hard-blocked. **§6.3 routing** — the engine UI's list/detail/builder each get their
+own URL (design §3.7 applies inside a mounted package component too). Flags that khronoton-core doesn't
+yet satisfy these (tracked in Pythia's evented-resolver handoff) and that an automaton implementing the
+pattern from scratch must satisfy §6 directly.
+
 ## 2026-08-03 — new `identity/how-an-entity-becomes-a-pythia-verifier.md`
 
 Added the entity-level standard for **how a Pantheon entity becomes a Pythia verifier** — the trust

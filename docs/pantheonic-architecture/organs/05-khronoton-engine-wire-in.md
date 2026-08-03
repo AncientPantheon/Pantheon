@@ -136,3 +136,42 @@ Learned live in Pythia (`constructors/Pythia`, `apps/pythia/src/automaton/khrono
   **"Evented"**, not a time. A NON-evented, schedule-driven resolver (Pythia's `pyth-flush`, a daily
   flush) keeps its schedule normally. Whether a resolver is evented is the consumer's knowledge (the
   engine's resolver type has no such flag today — handoff pending).
+
+### 6.1 Setup completeness — every server resolver must be consumed
+
+An automaton **declares a fixed set of server resolvers** in code (Pythia: `dual-link-activate`,
+`pyth-flush`). The setup is **complete only when every declared resolver is consumed by exactly one
+constructed cronoton** (one ↔ one, above). A registered resolver with no cronoton is a dead capability
+(nothing to fire); a cronoton is the on-chain template that makes a resolver real. The admin must be
+able to SEE this: a **server-resolver roster** — each declared resolver, whether it's consumed, and by
+which cronoton — so "is my automaton fully wired?" is answerable at a glance (green when all consumed).
+
+### 6.2 UI requirements for a server-resolver cronoton (the Builder/detail/list)
+
+A cronoton that embeds a server resolver is **special** and the UI must show it as such — never render it
+as if it were an ordinary scheduled cronoton:
+
+- **Mark it visibly.** A badge on the detail/list ("embeds server resolver: `<name>`", plus
+  "externally fireable" / "updates server state" as applicable) so it's obviously automaton-managed.
+- **Evented ⇒ scheduler OFF, everywhere.** For a trigger-only/evented cronoton: the **Schedule** field
+  reads **"Evented"** (NOT the stored `schedule_mode`/`config` — showing "Daily at 12:00 UTC" for a row
+  that never fires on a clock is a bug), **Next Fire** reads "Evented"/"—", and the **edit form disables
+  the schedule controls entirely** (you cannot set a schedule on an evented cronoton).
+- **Deletable with a warning, not hard-blocked.** A system (server-resolver) cronoton must be
+  **deletable by an admin** — behind a clear warning ("this is the automaton's `<name>` template;
+  deleting it stops that capability until you recreate it"), NOT a flat refusal. (A hard block leaves an
+  operator unable to clean up a wrong/duplicate template.)
+
+### 6.3 Routing — every view is addressable (§3.7 applies inside the engine UI too)
+
+The engine's own admin surface (cronoton **list**, **detail**, **builder**) is part of the site and MUST
+obey the Pantheon routing rule (design §3.7): each view has its **own URL** (`#khronoton`,
+`#khronoton/<id>`, `#khronoton/new`), rendered from the URL and back-navigable — not internal in-memory
+navigation behind one static `#khronoton`. This holds even when the engine UI is a mounted package
+component: the mount must participate in the host's router.
+
+> These UI/routing/roster requirements are **not yet in `@ancientpantheon/khronoton-core`** — its
+> Builder renders the stored schedule for an evented row, hard-blocks system deletes, exposes no
+> resolver roster, and routes its internal pages in memory. Tracked as asks in Pythia's
+> `docs/HANDOFF-khronoton-evented-resolver-scheduleless.md`. An automaton implementing this pattern
+> **from scratch** (not via the shared package) must satisfy all of §6 directly.
