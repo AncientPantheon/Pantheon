@@ -542,27 +542,38 @@ consumer's own agent/session separately when ready to execute.
 
 ## 6 · Pythia is the Pantheon's on-chain METER — every entity's traffic must flow through her
 
-**Principle (load-bearing):** Pythia's reason to exist is to be the single meter of ALL Pantheon
-on-chain activity. **Every read and every transaction — from anyone — must be counted in Pythia's Pyth
-ledger** (`petitions`/`pondus` for reads, `transactions`/`gas-reserved` for sends). "Anyone" is
-exhaustive:
+**Principle (load-bearing):** Pythia is the single meter of Pantheon on-chain activity. Two counters,
+two DIFFERENT rules — do not conflate them:
 
-- **Consumers** reading/broadcasting through Pythia's gateway (`/read`, `/send`) — metered by the
-  gateway middleware (`recordRead`/`recordSend`).
+**PETITIONS + PONDUS = reads Pythia SERVES to a client.** A "client read" is any read any client asks
+of Pythia through her `/read` gateway — including **Pythia's own frontend** reading chain data to
+display it, **OuronetUI**, **StoaExplorer**, **Mnemosyne**, any consumer. Every one of those counts a
+petition (+ pondus). **EXCLUSION — Pythia's OWN internal dirty reads do NOT count**: the reads her
+machinery performs for itself and never serves to a client — the automaton's pre-fire safety-simulates,
+gas calibration, verify-flow trust-anchor reads, cache polls, health checks. Counting those would
+inflate petitions with Pythia's own plumbing. Rule of thumb: **served to a client → counts; Pythia
+reading for her own purposes → does not.** (Metering lives at the `/read` gateway middleware, which
+only sees client-served reads. The automaton's Khronoton runtime `dirtyRead` is deliberately passed
+through UNMETERED — see `meterChainRuntime`.)
+
+**TRANSACTIONS + GAS-RESERVED = every send/fire that touches the chain through Pythia.** Here the rule
+IS exhaustive — nothing hits the chain on the Pantheon's behalf without being counted:
+
+- **Consumers** broadcasting through Pythia's `/send` gateway — metered by the gateway middleware
+  (`recordSend`).
 - **Pythia's OWN automaton fires** (her Khronoton cronotons — `A_Link`, `A_Flush`, …). These submit
-  straight to a node via Khronoton's chain runtime, which would otherwise **bypass** the meter. Pythia
-  therefore wraps that runtime (`meterChainRuntime`) so each `submit → recordSend` and each
-  `dirtyRead → recordRead` — every automaton on-chain action counts, exactly like consumer traffic.
-- **Every OTHER automaton / daimon** (Mnemosyne, OuronetUI, and future ones like **Aletheia**). The
-  rule generalizes: **an automaton must not fire directly to a node unmetered — its on-chain traffic
-  has to be routed through Pythia so it counts.** Two sanctioned ways: (a) broadcast/read *through*
-  Pythia's transport (the `/send`+`/read` gateway, e.g. via `@ancientpantheon/pythia-client`), or (b)
-  if it runs its own embedded Khronoton, wrap that engine's chain runtime with the same metering seam
-  Pythia uses (`meterChainRuntime` pattern) reporting into the shared ledger. Whichever an automaton
-  picks, the invariant is the same: **nothing touches the chain on behalf of the Pantheon without
-  Pythia counting it.**
+  straight to a node via Khronoton's chain runtime, which would otherwise bypass the meter — so Pythia
+  wraps that runtime (`meterChainRuntime`) to count each `submit → recordSend`. (Only the submit; NOT
+  the dirtyRead, per the read rule above.)
+- **Every OTHER automaton / daimon** (Mnemosyne, OuronetUI, future **Aletheia**). The rule generalizes:
+  **an automaton must not fire directly to a node unmetered** — either broadcast *through* Pythia's
+  `/send` gateway (e.g. via `@ancientpantheon/pythia-client`), or, if it runs its own embedded
+  Khronoton, wrap that engine's chain runtime with the same `meterChainRuntime` seam. Firing unmetered
+  is a conformance bug.
 
-So when Aletheia (or any new automaton) comes online and starts firing transactions, those MUST land in
-this same ledger — via the gateway or the metered-runtime seam. An automaton that fires unmetered is a
-conformance bug. Reference: `constructors/Pythia` — `apps/pythia/src/pyth/{ledger,meter,pondus}.ts`
-(the meter) and `apps/pythia/src/automaton/khronoton/meteredRuntime.ts` (the automaton-fire seam).
+**Hub reporting:** the per-slot usage report to the hub (the operator-earning "money path") carries the
+client-served READS (keyed + anon requests, keyed pondus) — Pythia's own excluded dirty reads never
+enter it because they were never counted. Reference: `constructors/Pythia` —
+`apps/pythia/src/pyth/{ledger,meter,pondus}.ts` (the meter), `apps/pythia/src/stats/{slotUsage,
+usageReporter}.ts` (the hub report), and `apps/pythia/src/automaton/khronoton/meteredRuntime.ts` (the
+automaton-fire seam — meters submit only).
