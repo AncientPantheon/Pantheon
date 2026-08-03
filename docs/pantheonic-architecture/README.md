@@ -22,8 +22,10 @@ Read in this order:
    sealed-vault crypto every automaton reuses, and the **Deploy Panel standard** (status readout +
    always-moving progress) every on-box deploy must implement.
 3. **[`identity/`](./identity)** — hub login + ownership verification, which appear *everywhere*: the
-   central AncientHub SSO service, the "Login with AncientHub in any consumer" recipe, and the
-   generic Apollo-ownership verifier (`/apollo-verify`).
+   central AncientHub SSO service, the "Login with AncientHub in any consumer" recipe, the
+   generic Apollo-ownership verifier (`/apollo-verify`), and **how an entity becomes a Pythia
+   verifier** (`how-an-entity-becomes-a-pythia-verifier.md` — the entity-level trust-anchor standard,
+   naming Mnemosyne + OuronetUI as the first two).
 4. **[`organs/`](./organs)** — the shared constructor packages you consume — **all three now
    finalized**: `@ancientpantheon/codex`, `@ancientpantheon/khronoton-core`, and
    `@ancientpantheon/pythia-client`: the package-structure blueprint, how to wire the Khronoton
@@ -44,7 +46,7 @@ Read in this order:
 |---|---|---|
 | `design/` | width · tokens · header · admin layout · theming | the UI/UX standard |
 | `automaton/` | the blueprint · master-key sealed-vault · deploy-panel + progress standard | how to build an automaton |
-| `identity/` | SSO · consumer-login · Apollo verifier | login/verification everywhere |
+| `identity/` | SSO · consumer-login · Apollo verifier · **how an entity becomes a Pythia verifier** | login/verification everywhere |
 | `organs/` | package blueprint · khronoton wire-in · codex re-key · consumer integration · **pythia-client connector wire-in** · dependency contract | the shared packages — 3 organs, all finalized |
 | `patterns/` | *(empty — see §5 above)* | reference feature implementations |
 | `archive/` | superseded khronoton package draft · Codex v2 plan · 3 superseded Pythia consumer-key docs | historical / example |

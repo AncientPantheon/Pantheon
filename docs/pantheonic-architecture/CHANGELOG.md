@@ -2,6 +2,30 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-03 — `design/…` §3.7 + §5.1 + conformance: URL-addressability extends to Tier-3 sub-tabs
+
+Extended the "every navigable view has its own URL" standard down to **Tier-3**: a sub-tab strip
+inside a view (e.g. the admin StoaChain connector page's Hub Feed / Observation / Upload / Routing
+tabs) must be addressable one level deeper (`#section/sub/subtab`), routed from the URL — a click
+navigates the hash, the router shows the panel, Back restores the prior sub-tab, and a bare view URL
+resolves to the strip's declared default. Closes the anti-pattern of a sub-tab strip that flips panels
+in memory behind an unchanging URL (addressable at Tier-1/Tier-2 but opaque at Tier-3). Learned live
+in Pythia, which now implements it (`VIEW_SUBTABS` + `applySubtab` in `public/admin.js`); landing
+Tier-1/Tier-2 already conformed. Updated §3.7, §5.1, and the §7 conformance checklist.
+
+## 2026-08-03 — new `identity/how-an-entity-becomes-a-pythia-verifier.md`
+
+Added the entity-level standard for **how a Pantheon entity becomes a Pythia verifier** — the trust
+anchor that proves a user controls both Apollo halves before Pythia autonomously fires
+`A_LinkDualApiKey`. Companion to the existing byte-exact `HANDOFF-apollo-ownership-verifier.md` (which
+tells the Codex agent how to *build* `/apollo-verify`); the new doc says what an *entity* must run and
+register to be a verifier: Apollo key custody in a Codex, serving `/apollo-verify` at a stable origin,
+signing the canonical message byte-exact, reachability, and registration in Pythia's admin verifier
+registry (Pythia seeds none — registration is the deliberate human on-ramp). Names **Mnemosyne** and
+**OuronetUI** as the first two supported verifier entities (only these two for now; the gate is Apollo
+key custody, expansion TBD at the Pantheon level). Unblocks the operator-driven step of bringing
+Mnemosyne up to verifier status.
+
 ## 2026-08-03 — `organs/05-khronoton-engine-wire-in.md`: DELEGATE key resolution to Codex, don't hand-roll a KeyResolver
 
 Refined (same day) after establishing the root cause: the seedType signing bug arose because each

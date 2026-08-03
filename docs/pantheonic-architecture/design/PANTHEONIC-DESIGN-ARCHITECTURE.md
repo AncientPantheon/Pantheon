@@ -150,6 +150,15 @@ surface** — one link per view, always.
   `/admin#section/sub`), **generalized to every surface**. Both landing forms obey it (§4): Form B's
   anchored sections are addressable by construction; Form A drives its work-area panels from the hash,
   not from in-memory state alone.
+- **Applies at EVERY tier, including a Tier-3 sub-tab row inside a view.** If a view has its own
+  sub-tab strip (e.g. the admin StoaChain connector page's Hub Feed / Observation Pool / Upload Pool /
+  Routing Rules), each sub-tab is its **own URL** one level deeper (`/#connectors/stoachain/upload`),
+  routed the same way — a click navigates; the router (not the click handler) shows the panel; Back
+  returns to the prior sub-tab. A bare view URL resolves **deterministically** to the sub-tab's
+  declared default, never last-used in-memory state. The anti-pattern this closes: a sub-tab strip
+  that flips panels in memory behind an unchanging URL — addressable at Tier-1/Tier-2 but opaque at
+  Tier-3. Pythia's admin implements this (`VIEW_SUBTABS` + `applySubtab` in `public/admin.js`); its
+  landing implements Tier-1/Tier-2 (`routeFromHash`/`showTab` in `public/app.js`).
 
 ---
 
@@ -294,6 +303,10 @@ This uses the full width efficiently (menu + content) instead of one narrow colu
   Deep-linkable and back-navigable.
 - **Nested sections** use `/admin#<section>/<sub>` and render sub-navigation *inside the pane* (tabs or
   a sub-list) — the sidebar holds top-level sections only.
+- **A pane sub-tab strip is Tier-3 and stays addressable** (§3.7): `/admin#<section>/<sub>/<subtab>`.
+  A sub-tab click navigates the hash; the router shows the panel; Back restores the prior sub-tab; a
+  bare `#<section>/<sub>` resolves to the strip's declared default. Never flip sub-tab panels in
+  memory behind an unchanging URL. (Pythia: `#connectors/stoachain/upload`.)
 - A **planned/disabled** section shows greyed in the sidebar with a badge and is inert — clicking posts
   a short "coming later" note in the pane, never a broken view.
 
@@ -344,6 +357,8 @@ horizontal scrollable row of chips; the routing model is unchanged.
 - [ ] Tier-2 navigation lives ONLY in the header — never duplicated in the content panel.
 - [ ] Every Tier-1/Tier-2 view and every page has its **own** deep-linkable URL (path or `#hash`),
       rendered from the URL on load and Back — never a single opaque link for the whole surface (§3.7).
+      **Tier-3 counts too:** a sub-tab strip inside a view is addressable one level deeper
+      (`#section/sub/subtab`), routed from the URL — never flipped in memory behind a static URL.
 - [ ] The landing takes **one of the two sanctioned forms** (§4). Form A — a single-screen fixed page:
       fixed header + footer, one `.landing-mid` scroll region, a `--stage-h` stage that neither grows
       nor collapses, and (when a portrait is used) a fixed-box portrait (no letterbox) with a collapse
