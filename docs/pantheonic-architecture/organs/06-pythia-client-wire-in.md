@@ -307,6 +307,38 @@ box exists.
 > See `constructors/Pythia/docs/work/self-connector-boot-tick-and-layout/design.md` for the full
 > record.
 
+> **Correction (2026-08-04, Mnemosyne's `pythia-connector-rework` topic):** the single most
+> important thing for a consumer to understand, and the one this doc left implicit until Mnemosyne
+> hit it head-on — **a `DualLinkConnector` (or `PythiaConnector`) does NOTHING until something ticks
+> it.** `status()` only ever REPORTS cached per-half state; it never itself performs the
+> challenge → sign → verify round trip that mints the ephemeral secret. That round trip fires only
+> when something calls `tick()` / `ensureSecret()` / `keyProvider()`. Two consequences a consumer
+> MUST design for:
+>
+> 1. **Activation is MULTI-STEP, so a single tick can't complete it.** Each half's first prove
+>    returns `202 pending` and merely RECORDS the proof; Pythia's own activation resolver then fires
+>    the Cronoton-signed `A_LinkDualApiKey`; only a SUBSEQUENT prove (after the link is active
+>    on-chain) returns `200` with the secret. The pair therefore converges over SEVERAL ticks — it
+>    is not "tick once and read the key."
+> 2. **The request-time `keyProvider()` pattern (Step 3) mints on demand ONLY when a real gated
+>    request actually flows through `PythiaClient`.** The parenthetical "…which needs no loop at
+>    all" in the 2026-08-02 correction above is true ONLY when live gated traffic is already flowing.
+>    A consumer whose gated `PythiaClient` is not yet consumed anywhere — or an admin STATUS PANEL
+>    viewed with no gated traffic behind it — will sit at `{pending, pending}` **forever** and never
+>    show a key, even though the pair is perfectly linked. (This is exactly what Mnemosyne shipped
+>    first: correct wiring, dormant client, panel stuck "pending / not yet minted.")
+>
+> **The rule: any consumer that DISPLAYS connector status — or that needs its gated key kept warm
+> independent of request traffic — MUST drive the connector itself.** Do all of: (a) a periodic
+> `tick()` loop started at server boot (with the immediate-tick-on-start fix above), a no-op before a
+> key is pasted, so a linked pair converges and refreshes unattended; (b) an immediate `tick()` the
+> moment a key is linked, so activation starts on the paste not on the next interval; and (c) a
+> `tick()` on each status-poll request, so the pair converges promptly while an operator watches the
+> panel (once active this is cheap — the connector returns its cached secret with no round trip until
+> near expiry). Reference: Mnemosyne's `automatons/Mnemosyne/lib/pythia/connectorLoop.ts`
+> (`startPythiaConnectorLoop` in `instrumentation.ts`, `tickPythiaConnectorOnce` from the link route
+> and the status route). See `automatons/Mnemosyne/docs/work/pythia-connector-rework/design.md`.
+
 **Step 1 — obtain an active dual-link-key.** Unchanged from §2d above, just cross-referenced here,
 not rewritten: deploy both Apollo halves and link them via Codex's own account-management flow
 (`C_DeployApolloPythiaApiKey` ×2 + `C_LinkDualApiKey`, real STOA, human-initiated), then prove
@@ -507,3 +539,30 @@ consumer onto it live is the admin's call** — same standing rule `organs/05-kh
 
 Do not wire either live from this handoff alone — it documents the pattern; the admin instructs each
 consumer's own agent/session separately when ready to execute.
+
+## 6 · Pythia is the Pantheon's on-chain METER — every entity's traffic must flow through her
+
+**Principle (load-bearing):** Pythia's reason to exist is to be the single meter of ALL Pantheon
+on-chain activity. **Every read and every transaction — from anyone — must be counted in Pythia's Pyth
+ledger** (`petitions`/`pondus` for reads, `transactions`/`gas-reserved` for sends). "Anyone" is
+exhaustive:
+
+- **Consumers** reading/broadcasting through Pythia's gateway (`/read`, `/send`) — metered by the
+  gateway middleware (`recordRead`/`recordSend`).
+- **Pythia's OWN automaton fires** (her Khronoton cronotons — `A_Link`, `A_Flush`, …). These submit
+  straight to a node via Khronoton's chain runtime, which would otherwise **bypass** the meter. Pythia
+  therefore wraps that runtime (`meterChainRuntime`) so each `submit → recordSend` and each
+  `dirtyRead → recordRead` — every automaton on-chain action counts, exactly like consumer traffic.
+- **Every OTHER automaton / daimon** (Mnemosyne, OuronetUI, and future ones like **Aletheia**). The
+  rule generalizes: **an automaton must not fire directly to a node unmetered — its on-chain traffic
+  has to be routed through Pythia so it counts.** Two sanctioned ways: (a) broadcast/read *through*
+  Pythia's transport (the `/send`+`/read` gateway, e.g. via `@ancientpantheon/pythia-client`), or (b)
+  if it runs its own embedded Khronoton, wrap that engine's chain runtime with the same metering seam
+  Pythia uses (`meterChainRuntime` pattern) reporting into the shared ledger. Whichever an automaton
+  picks, the invariant is the same: **nothing touches the chain on behalf of the Pantheon without
+  Pythia counting it.**
+
+So when Aletheia (or any new automaton) comes online and starts firing transactions, those MUST land in
+this same ledger — via the gateway or the metered-runtime seam. An automaton that fires unmetered is a
+conformance bug. Reference: `constructors/Pythia` — `apps/pythia/src/pyth/{ledger,meter,pondus}.ts`
+(the meter) and `apps/pythia/src/automaton/khronoton/meteredRuntime.ts` (the automaton-fire seam).

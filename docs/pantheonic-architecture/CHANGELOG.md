@@ -2,6 +2,22 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-04 — `organs/06` §2e gained a fourth correction: a consumer MUST drive the connector, or it never mints a key
+
+Learned live in Mnemosyne (`pythia-connector-rework`): the doc left implicit that a `DualLinkConnector`
+does NOTHING until something ticks it — `status()` only reports cached state, and the request-time
+`keyProvider()` mints a secret ONLY when real gated traffic flows through `PythiaClient`. Mnemosyne
+shipped correct wiring with a dormant gated client, so its admin panel sat at `{pending, pending}`
+forever even though the pair was perfectly linked. Added a callout making the rule explicit: any
+consumer that DISPLAYS connector status (or wants its key kept warm independent of request traffic)
+must drive the connector itself — a boot-time `tick()` loop (with the immediate-tick-on-start fix),
+an immediate tick on link, and a tick on each status poll — because activation is multi-step (prove →
+Pythia's resolver links → prove → secret) and can't complete on a single tick. Corrects the earlier
+"needs no loop at all" wording (true only when live gated traffic already flows). Reference:
+Mnemosyne's `lib/pythia/connectorLoop.ts`. (Mnemosyne's own connector panel was also brought into full
+conformance with §2e's presentation spec — framed `.acct-card` halves with ellipsis-truncated
+addresses, one consolidated masked secret + depleting timer bar + always-seconds countdown.)
+
 ## 2026-08-03 — `design/…` §3.7 + §5.1 + conformance: URL-addressability extends to Tier-3 sub-tabs
 
 Extended the "every navigable view has its own URL" standard down to **Tier-3**: a sub-tab strip
@@ -12,6 +28,16 @@ resolves to the strip's declared default. Closes the anti-pattern of a sub-tab s
 in memory behind an unchanging URL (addressable at Tier-1/Tier-2 but opaque at Tier-3). Learned live
 in Pythia, which now implements it (`VIEW_SUBTABS` + `applySubtab` in `public/admin.js`); landing
 Tier-1/Tier-2 already conformed. Updated §3.7, §5.1, and the §7 conformance checklist.
+
+## 2026-08-04 — `organs/06` §6: Pythia is the Pantheon's on-chain METER — every entity's traffic must flow through her
+
+Recorded the load-bearing principle (learned live): Pythia exists to count ALL Pantheon on-chain
+activity in her Pyth ledger — consumer gateway traffic, **her own automaton fires** (which submit
+straight to a node and previously bypassed the meter — now wrapped via `meterChainRuntime`), AND every
+other automaton/daimon (Mnemosyne, OuronetUI, future Aletheia). The rule generalizes: an automaton must
+not fire directly-to-node unmetered; its on-chain traffic must route through Pythia — either through her
+`/send`+`/read` gateway, or, if it runs its own embedded Khronoton, by wrapping that engine's chain
+runtime with the same metering seam. Firing unmetered is a conformance bug.
 
 ## 2026-08-03 — `organs/05` §6.1–6.3: server-resolver setup completeness + UI/routing requirements
 
