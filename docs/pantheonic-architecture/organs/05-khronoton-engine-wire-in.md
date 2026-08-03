@@ -104,3 +104,35 @@ Per the ancient admin's standing decision: **do not wire consumers live until al
 
 ## 5. Forward idea (not this handoff) — automaton provenance on the explorer
 Planned: Khronoton's executor stamps a marker on each fired tx (pragmatic: the Kadena `nonce = "khronoton:<automatonId>:<cronotonId>:<fingerprint>"`; verifiable: a registered automaton signer pubkey or a signed marker cap) so StoaExplorer badges automaton txs and deep-links back to the cronoton's public view. Cross-repo (Khronoton `/server` + StoaExplorer), separate track.
+
+---
+
+## 6. Server-resolver rules (binding, uniqueness, evented) — for every khronoton consumer
+
+A **server resolver** fills a cronoton's payload (and, for a single-tx resolver, drains its work) at
+fire time. These rules govern how a consumer (Pythia today, Mnemosyne next) binds and uses them.
+Learned live in Pythia (`constructors/Pythia`, `apps/pythia/src/automaton/khronoton/`).
+
+- **The `serverResolver` name IS the tag — the whole binding.** A resolver is registered in code under a
+  name (`registerServerResolver("dual-link-activate", …)`); a cronoton references that exact name in its
+  `serverResolver` field. Both ends rendezvous on the string — the tick (or an event trigger via
+  `findCodexCronotonIdByServerResolver(name)`) fires the cronoton whose `server_resolver` equals it. A
+  typo, blank, or mismatched name = nothing fires. There is no separate "subscription"/ticker: the name
+  is the wiring. The cronoton's pact `(read-msg "<key>")` keys MUST match the resolver's payload keys
+  (Pythia: `standardApollo`/`smartApollo`).
+
+- **One resolver ↔ one cronoton (uniqueness).** A server-resolver name must be bound to **exactly one**
+  cronoton. `findCodexCronotonIdByServerResolver` returns the *most-recently-created* match, so a second
+  cronoton on the same resolver silently shadows the first (the wrong template fires). To replace a
+  server-resolved cronoton, **delete the old one, then create** — never leave two. Pythia enforces this
+  consumer-side (a commit reusing a bound resolver is rejected 409); ideally the store enforces it
+  package-wide (see the evented-resolver handoff).
+
+- **An EVENTED resolver ⇒ a scheduleless cronoton.** A resolver fired by an in-process event (Pythia's
+  `dual-link-activate`, fired on a verified-pair *link event*) is NOT schedule-driven. Its cronoton must
+  be **trigger-only** (`externalFireable` → `next_fire_at = NULL` → the tick's `next_fire_at IS NOT NULL`
+  due-query skips it); the event fires it via `executeNow`. Picking such a resolver in the builder should
+  turn scheduling OFF (Pythia forces this at commit), and the cronoton's "next fire" should read
+  **"Evented"**, not a time. A NON-evented, schedule-driven resolver (Pythia's `pyth-flush`, a daily
+  flush) keeps its schedule normally. Whether a resolver is evented is the consumer's knowledge (the
+  engine's resolver type has no such flag today — handoff pending).
