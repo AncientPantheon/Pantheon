@@ -2,6 +2,18 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-04 — new `HANDOFF-ouronetui-daimon-migration.md`
+
+Added the migration handoff for **OuronetUI** to adopt the Pantheonic architecture as a **daimon** (uses
+Pythia + Codex, NOT Khronoton — it performs no autonomous transactions). Specifies: the vertical→3-tier
+horizontal header + URL routing migration; the two distinct logins (USER = create/load Codex, dropping
+Google Drive; ADMIN = Login with AncientHub gating settings); OuronetDev's own Codex holding its two
+already-linked Apollo halves + a `DualLinkConnector` minting the ~3h `x-pythia-key`; all blockchain
+traffic routed through Pythia by default with an OFFLINE-until-Pythia state and an admin-only fallback to
+direct nodes (node1/node2 + custom); the daimon Update-page variant (lists Khronoton's version but never
+pulls it); and the footer Pythia connection status replacing the node2 line. Research-first, dev-branch,
+nectar lifecycle. Mnemosyne storage-tier integration explicitly out of scope.
+
 ## 2026-08-04 — `organs/06` §2e gained a fourth correction: a consumer MUST drive the connector, or it never mints a key
 
 Learned live in Mnemosyne (`pythia-connector-rework`): the doc left implicit that a `DualLinkConnector`
