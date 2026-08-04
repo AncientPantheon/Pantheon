@@ -2,6 +2,20 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-05 — `HANDOFF-explorer-seer-migration.md` §4.1: the block-ingest lane is settled (single fixed node, NOT Pythia)
+
+Resolved the §4 research flag against Pythia's actual source. Confirmed Pythia relays only Pact
+`/local | /send | /poll` and exposes none of the chainweb data-layer endpoints (`cut / header /
+payload / branch`) an indexer needs. Decided — and folded into the handoff — that the Explorer runs
+TWO separate chain lanes: **block ingest** sources from a SINGLE admin-configured node (never Pythia,
+never a rotating/failover pool — an indexer needs one coherent view; rotating causes height-skew gaps,
+split-branch reorg inconsistency, and backfill 404s), swappable via an admin-only fallback list
+(node1 → node2 → custom) on health/manual; **on-page reads** route through Pythia as normal (keyed →
+metered → earning). Routing block ingest through Pythia is explicitly out of scope — it would need a
+Pythia block-relay enhancement (a new metered verb + a bytes-weighted counter + a PINNED single-node
+relay, not the failover pool) and only if the operator later wants block-pull volume in the Pyth
+economy. Updated §4/§4.1, §5 (per-lane availability), the acceptance criteria, and §9.
+
 ## 2026-08-04 — new `HANDOFF-explorer-seer-migration.md`
 
 Added the migration handoff for the **Explorer** (StoaExplorer / Ouronet Explorer — a NestJS backend +

@@ -93,29 +93,53 @@ NOT a user login; the Explorer has no per-user accounts (it's a public read-only
 - Wire the **`DualLinkConnector`** (`organs/06 §2e`) with the Explorer's composite `dual-link-key`,
   driven on an immediate-then-~3h loop (mirror Mnemosyne's `connectorLoop.ts`), minting the live
   `x-pythia-key`.
-- **The BACKEND uses that connection to source chain data via Pythia** — its polling/read path reads
-  through Pythia's gateway with the Explorer's ephemeral key (so, per `organs/06 §6`, the Explorer's
-  reads are keyed and counted at the hub). The frontends just display the DB + the connection status.
+- **The Explorer runs TWO SEPARATE chain lanes** (see §4.1 — this is settled architecture, do not
+  re-litigate). Genuine on-page reads route through Pythia (keyed → metered → counted at the hub, per
+  `organs/06 §6`); block ingestion does NOT. The frontends just display the DB + the connection status.
 
-> **RESEARCH FLAG (resolve in the design phase, do not assume).** Pythia's gateway `/read` relays a Pact
-> **dirty read** (`/local`). A block-downloading explorer also needs chainweb **cut / block-header /
-> block-payload** endpoints. **Confirm whether Pythia relays those, or only `/local`.** Three outcomes:
-> (a) Pythia already relays what the poller needs → route the backend through Pythia; (b) it doesn't →
-> this needs a Pythia enhancement (a block-relay surface) — write that as a Pythia handoff and, until it
-> lands, keep the poller on the admin-configured node while routing the Pact reads through Pythia; (c)
-> decide, with the operator, the interim split. Do NOT silently point the whole poller at Pythia if it
-> can't serve those endpoints — that would break ingestion.
+### 4.1 · TWO chain lanes — SETTLED (was a research flag; now decided)
+
+Verified at the source: Pythia today relays only Pact `/local | /send | /poll` and does **NOT** expose
+the chainweb data-layer endpoints (`cut / header / payload / branch`) an indexer needs. More importantly,
+even if it did, routing ingest through Pythia would be **wrong** — so keep the two lanes separate:
+
+- **BLOCK INGEST LANE** (the firehose: `cut / header / payload / branch`, plus backfill/reorg traversal)
+  → sources from a **SINGLE FIXED NODE**. **NOT** through Pythia, **NOT** a rotating/failover pool.
+  Reason: indexing needs **one coherent view** of the chain. Rotating across nodes causes height-skew
+  gaps, split-branch inconsistency during reorgs, and 404s on backfill (mixed node retention). Pythia's
+  dial layer is a failover **pool** chosen for availability, not coherence — the wrong tool for ingest.
+  - Pin to **one active node at a time**, **admin-configurable** with a fallback list
+    (`node1.stoachain.com` → `node2.stoachain.com` → custom), switched on **health/manual** — **not**
+    striped across several. One source, swappable; never a load balancer.
+  - This node config is a BACKEND concern and stays **behind the ADMIN (AncientHub) login** — never
+    public (it controls what the backend downloads into the DB; §3).
+
+- **READ LANE** (genuine on-page reads: stoa supply, small Pact queries)
+  → routes through **Pythia** as normal, keyed with the Explorer's `x-pythia-key` (metered/earning,
+  benefits from Pythia's failover, low volume, no consistency requirement).
+
+**NOT DOING:** routing block ingest through Pythia. That would require a Pythia **block-relay
+enhancement** (a new metered verb + a bytes-weighted counter + a **pinned** single-node relay lane, not
+the failover pool) and only makes sense if the operator later decides the Pyth economy must account for
+block-pull volume. **Out of scope** for this migration unless the operator explicitly asks — and if it
+ever happens it must be a pinned single-node relay, never Pythia's failover pool. No research needed on
+this point; build against the two-lane split above.
 
 ---
 
-## 5 · Offline-until-Pythia + admin-only direct-node FALLBACK
+## 5 · Availability per lane (the two lanes fail independently)
 
-Same rule as OuronetUI: **default = via Pythia.** If Pythia is unavailable and no fallback is set, the
-Explorer's live chain source is down (it can still serve what's already in its DB, but new ingestion via
-Pythia stalls) — surface that state clearly. The **admin** (only) can switch the backend to a
-**direct-node** source: **`node1.stoachain.com` / `node2.stoachain.com`**, and can **add other custom
-node URLs**. This is the break-glass for when Pythia is down; the default stays Pythia. All node/source
-switching lives behind the admin login (§3) — never public.
+Given the §4.1 split, the two lanes have **different** availability rules — don't conflate them:
+
+- **Block ingest lane** always runs off the **admin-configured single node** (never Pythia). If that
+  node is down, ingestion stalls — the Explorer keeps serving whatever is already in its DB; surface the
+  ingest source's health clearly. Recovery = admin switches the active node to the next in the fallback
+  list (`node1` → `node2` → custom). This lane never depends on Pythia.
+- **Read lane** is **via Pythia by default.** If Pythia is unavailable the on-page reads degrade; surface
+  that state (the read-only Pythia connection status, §3). An admin-only break-glass MAY point the read
+  lane at a direct node too, but the default stays Pythia.
+
+All node/source switching (either lane) lives behind the admin login (§3) — never public.
 
 ---
 
@@ -151,10 +175,11 @@ switching lives behind the admin login (§3) — never public.
 - [ ] Public Settings expose ONLY theme/colour + a read-only Pythia connection status. All chain-source
       config (backend URL, node URL, network, presets) is behind the AncientHub admin login.
 - [ ] The Explorer has its own Codex (Apollo halves) + a `DualLinkConnector` minting the ~3h
-      `x-pythia-key`, and the backend sources chain data via Pythia by default (subject to the §4
-      research flag's resolution).
-- [ ] Admin can switch the backend to a direct-node fallback (`node1`/`node2` + custom nodes) when Pythia
-      is down; default is Pythia; the switch is admin-only.
+      `x-pythia-key`, and the **read lane** (on-page Pact reads) routes through Pythia by default.
+- [ ] The **block ingest lane** sources from a SINGLE admin-configured node (never Pythia, never a
+      rotating pool), with an admin-only fallback list (`node1`/`node2` + custom) switched on
+      health/manual. Block ingest through Pythia is NOT built (§4.1 out-of-scope).
+- [ ] Admin can switch either lane's node source; both are admin-only; no source config is public.
 - [ ] Update page lists pythia-client + codex (pulled) and Khronoton (version shown, NOT pulled — seer).
 - [ ] A public user can NEVER point the backend at an arbitrary node from the UI.
 - [ ] Runs on the dev branch, testable locally and on the dev link, with the existing explorer features
@@ -164,6 +189,7 @@ switching lives behind the admin login (§3) — never public.
 
 ## 9 · When done
 
-Report the dev-link URL(s), a note per acceptance criterion, and — importantly — **the §4 research
-verdict** (does Pythia relay the poller's endpoints, and what interim split you chose). Don't merge to
-prod; the operator decides go-live (the staged-integration gate, `organs/05 §4`).
+Report the dev-link URL(s) and a note per acceptance criterion — in particular confirm the **two-lane
+split** is in place (block ingest off a single admin-configured node, reads via Pythia; §4.1). That
+question is settled architecture now, not a research item. Don't merge to prod; the operator decides
+go-live (the staged-integration gate, `organs/05 §4`).
