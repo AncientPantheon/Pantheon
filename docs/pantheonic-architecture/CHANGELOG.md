@@ -2,6 +2,21 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-04 — new `HANDOFF-explorer-seer-migration.md`
+
+Added the migration handoff for the **Explorer** (StoaExplorer / Ouronet Explorer — a NestJS backend +
+two frontends over one DB) to adopt the Pantheonic architecture as a **SEER** (observes the chain: polls,
+downloads, and serves blocks; reads via Pythia; holds its own Codex for the connection; no Khronoton, no
+transactions). Sibling to the OuronetUI daimon handoff, with three deltas: it's a seer, it has a polling
+backend + database, and it has two frontends over one backend (so every UI change is a double
+implementation). Core safety change: split Settings — PUBLIC keeps only theme + a read-only Pythia
+connection status; the chain SOURCE (node/backend URL, network, presets — what the backend downloads into
+its DB) moves behind the AncientHub admin login, so a public user can never point ingestion at an
+arbitrary node. Its own Codex (Apollo halves) drives the ~3h `x-pythia-key`; the backend sources chain
+data via Pythia by default with an admin-only direct-node fallback (node1/node2 + custom). Flags the one
+real research question: whether Pythia's gateway relays the chainweb block/header/payload/cut endpoints
+the poller needs, or only `/local` Pact reads.
+
 ## 2026-08-04 — new `HANDOFF-ouronetui-daimon-migration.md`
 
 Added the migration handoff for **OuronetUI** to adopt the Pantheonic architecture as a **daimon** (uses
