@@ -2,6 +2,18 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-05 — `organs/06` §6a expanded: the rule is ABSOLUTE — reads, simulations, sends AND autonomous fires, all through Pythia
+
+Clarified (from Mnemosyne's `pythia-write-routing`, taken to full conformance) that §6 leaves nothing on
+a node: a consumer's `signingClient` must route `dirtyRead` (gas simulation) through Pythia's
+`/stoachain/read` too — not just the send — and must NOT surface a per-user direct-node field (drop the
+local direct-node connection; a direct node is admin-gated only). Documented the embedded-Khronoton
+wrap concretely (`createClient` → submit/dirtyRead/listen forwarded to Pythia; ref
+`lib/khronoton/pythiaRoutedRuntime.ts`) and its **known gap**: Pythia's `/poll` reports mined-status
+only, not the on-chain command result, so a node-less consumer treats a mined fire as success — closing
+it needs `/poll` to return the command result (a Pythia enhancement). Metering is unaffected (counts at
+`/send`).
+
 ## 2026-08-05 — `organs/06` §6a: the loaded-CODEX send bypass, and the `signingClient` fix (so implementers don't guess)
 
 Learned live in Mnemosyne (`pythia-write-routing`, closing

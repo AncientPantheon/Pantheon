@@ -614,8 +614,23 @@ codex only): `app/api/pythia/relay/route.ts` (ancient-gated relay) + `app/codex/
 (the browser `signingClient`) + the `signingClient=` prop on the `<CodexProvider>` in
 `app/admin/codex/MnemosyneCodex.tsx`.
 
+**Everything, not just the send.** The rule is absolute: reads, gas SIMULATIONS, and sends all go
+through Pythia — a direct node is allowed ONLY when an admin explicitly sets one in admin-gated
+settings. So the `signingClient`'s `dirtyRead` must ALSO route through Pythia (`/stoachain/read`, a
+keyless Pact `local` — extract the `exec.{code,data}` from the built command), not a node `/local`.
+(Pythia's `/read` is unsigned/keyless, so its gas omits signer-cap overhead; the strategy's
+`calculateAutoGasLimit` margin absorbs that — accept it rather than reach for a node.) Likewise a
+consumer must NOT surface a per-user "direct node URL" field: drop the local direct-node connection so
+the chain resolves through the global Pythia connection or not at all.
+
 **Embedded-Khronoton fires are the OTHER path** (§6 bullet 3): a consumer that runs its own Khronoton
-(Mnemosyne does) also submits scheduled fires direct-to-node via khronoton-core's chain runtime. Route
-those the same way — wrap the runtime's `submit` to relay through Pythia's `/stoachain/send` (the
-consumer analogue of Pythia's own `meterChainRuntime`). Do not assume the codex fix covers it — it is a
-separate submit seam.
+(Mnemosyne does) also submits scheduled fires — and their pre-flight dirty-reads and confirmations —
+via khronoton-core's chain runtime. Route those the same way: wrap the runtime's `createClient` so
+`submit`→Pythia `/send`, `dirtyRead`→Pythia `/read`, `listen`→poll Pythia `/poll` until final (the
+consumer analogue of Pythia's own `meterChainRuntime`; reference impl: Mnemosyne's
+`lib/khronoton/pythiaRoutedRuntime.ts`). It is a SEPARATE submit seam from the codex fix — do not assume
+one covers the other. **Known gap:** Pythia's `/poll` reports mined-status only (`pending|final` +
+depth), NOT the on-chain command result, so a node-less consumer cannot fully distinguish a
+mined-but-FAILED fire from a successful one via poll alone — it treats mined as success. Closing this
+needs Pythia's `/poll` to return the command result (or a listen-equivalent). Metering is unaffected:
+the transaction counts the moment its `submit` reaches `/stoachain/send`.
