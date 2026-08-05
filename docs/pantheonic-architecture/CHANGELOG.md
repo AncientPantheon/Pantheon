@@ -2,6 +2,19 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-05 — new `HANDOFF-ouronetui-route-sends-through-pythia.md`
+
+Targeted fix-handoff for the OuronetUI agent, diagnosed live: transactions fired from OuronetUI don't
+increment Pythia's ledger because OuronetUI submits signed txs **directly to a chainweb node**, bypassing
+Pythia's `POST /stoachain/send`. Confirmed against the live fleet ledger (`GET /pyth`): today shows
+`petitions: 54` (reads reach Pythia and count) but `transactions: 0, failedTransactions: 0` — Pythia
+never received a send; the only lifetime transaction is her own automaton A_Link fire. Pythia side is
+correct (meter wired app-wide, `/stoachain/send` counts via the txTracker on mine). The fix is purely
+OuronetUI-side: route ALL writes through the SAME PythiaClient already used for reads —
+`client.send({chainId,cmds})` + `client.poll(...)` instead of direct-to-node submit — so the x-pythia-key
+rides along (routing makes the tx COUNT; the key makes it EARN at the hub). Reinforces `organs/06 §6`:
+a daimon routes reads AND sends AND polls through Pythia.
+
 ## 2026-08-05 — `HANDOFF-explorer-seer-migration.md` §4.1: the block-ingest lane is settled (single fixed node, NOT Pythia)
 
 Resolved the §4 research flag against Pythia's actual source. Confirmed Pythia relays only Pact
