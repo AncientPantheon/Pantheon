@@ -2,6 +2,19 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-05 — new `HANDOFF-mnemosyne-route-sends-through-pythia.md`
+
+Sibling to the OuronetUI send-routing handoff, tailored to Mnemosyne: asks the Mnemosyne agent to verify
+that on-chain transactions done on its website — **loading a Codex and operating on it** (handling
+stuff, and specifically **registering Apollo halves via the loaded Codex**) — are routed through Pythia's
+`POST /stoachain/send` so they're metered, rather than submitted direct-to-node (the exact miswire found
+in OuronetUI, where reads counted but sends bypassed the meter). Covers both transaction paths
+(website/loaded-Codex + Khronoton fires), the fix (route every SIGNED submit through the same
+`x-pythia-key` connection already used for reads — `client.send`/`client.poll`), the `pythia_no_tx_sender`
+503 to surface, and a concrete verify step (register a half → watch `/pyth` `transactions` move). Notes
+that keeping sends keyed is what makes them show as `byConsumer["mnemosyne"]` once Pythia's per-consumer
+attribution lands. Reinforces `organs/06 §6` (Pythia is the on-chain meter; all traffic flows through her).
+
 ## 2026-08-05 — new `HANDOFF-ouronetui-route-sends-through-pythia.md`
 
 Targeted fix-handoff for the OuronetUI agent, diagnosed live: transactions fired from OuronetUI don't
