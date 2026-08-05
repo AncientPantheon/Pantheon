@@ -2,6 +2,21 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-05 — `organs/06` §6a: the loaded-CODEX send bypass, and the `signingClient` fix (so implementers don't guess)
+
+Learned live in Mnemosyne (`pythia-write-routing`, closing
+`HANDOFF-mnemosyne-route-sends-through-pythia.md`). §6 already said "an automaton must not fire directly
+to a node unmetered," but a consumer that surfaces the codex-ouronet dashboard has a non-obvious trap:
+wiring the Pythia `global` connection routes **reads** (petitions climb, looks metered) while the codex's
+**writes** still submit direct-to-node inside `CodexSigningStrategy` — so `transactions` stays flat. Added
+§6a documenting the supported fix: inject a **`signingClient`** into `<CodexProvider>` whose `submit`
+relays the signed command through Pythia's `/stoachain/send` (keyed via a consumer-owned, auth-gated
+**server** relay, because the `x-pythia-key` is a server secret) while `dirtyRead` stays a direct-node
+`/local` for accurate gas; map `503 pythia_no_tx_sender` clearly with no node fallback. Also flags that a
+consumer's embedded-Khronoton fires are a SEPARATE submit seam needing the same treatment. Reference impl:
+Mnemosyne `app/api/pythia/relay/route.ts` + `app/codex/codexRelaySigningClient.ts` +
+`app/admin/codex/MnemosyneCodex.tsx`.
+
 ## 2026-08-05 — new `HANDOFF-mnemosyne-route-sends-through-pythia.md`
 
 Sibling to the OuronetUI send-routing handoff, tailored to Mnemosyne: asks the Mnemosyne agent to verify

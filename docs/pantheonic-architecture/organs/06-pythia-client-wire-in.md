@@ -577,3 +577,45 @@ enter it because they were never counted. Reference: `constructors/Pythia` —
 `apps/pythia/src/pyth/{ledger,meter,pondus}.ts` (the meter), `apps/pythia/src/stats/{slotUsage,
 usageReporter}.ts` (the hub report), and `apps/pythia/src/automaton/khronoton/meteredRuntime.ts` (the
 automaton-fire seam — meters submit only).
+
+### 6a · The trap when a consumer submits through a LOADED CODEX (do not guess this)
+
+A consumer that surfaces the codex-ouronet dashboard (`@ancientpantheon/codex`) — Mnemosyne, OuronetUI —
+has a **non-obvious send bypass**, proven live in Mnemosyne (`pythia-write-routing`). Wiring the Pythia
+`global` connection (§2c / `createPythiaConnection`) routes **reads** through Pythia (petitions climb),
+which makes it *look* metered. But the codex's **writes do NOT go through that connection.** The
+on-chain broadcast is done by codex-ouronet's `CodexSigningStrategy`, which submits via a
+`@stoachain/kadena-stoic-legacy` pact client **straight to a chainweb node** (`…/pact/api/v1/send`) —
+never through Pythia. So `petitions` moves while `transactions` stays flat. Being "connected" and having
+reads count is NOT proof the send path is metered — verify `transactions`/`failedTransactions` MOVE
+after a real fire.
+
+**The fix (the supported seam — no forking codex):** `<CodexProvider>` takes a **`signingClient`** prop.
+It becomes the strategy's `clientOverride`; the strategy calls exactly two methods on it —
+`dirtyRead(sim)` (simulate/gas) and `submit(signed)` (broadcast, must return `{ requestKey }`). Inject a
+client whose:
+
+- **`submit`** relays the SIGNED command through Pythia's `POST /stoachain/send` (via
+  `@ancientpantheon/pythia-client`'s `client.send({ cmds })`) — this is what makes the tx COUNT + be
+  attributed by key. Map Pythia's `503 { code:"pythia_no_tx_sender" }` to a clear error; **never** fall
+  back to a node. (`pythia_no_tx_sender` is NOT one of the client's thrown-envelope codes, so `send()`
+  returns it as a verbatim body — inspect the result, don't just catch.)
+- **`dirtyRead`** stays a direct-node `/local`: it is a full-command simulation whose gas (incl.
+  caps/signers) must be accurate, and `/stoachain/read` is code-only. A `/local` mutates nothing and is
+  not what the transaction meter counts.
+
+**Keying is a SERVER concern.** The codex signs in the browser, but the connector's `x-pythia-key` is a
+server secret (minted by the server-side connector loop). So the browser `submit` must POST to a
+**consumer-owned, auth-gated server relay** that attaches the key (the server-side gated `PythiaClient`)
+and forwards to Pythia — not call Pythia directly from the browser (which would be unkeyed →
+`byConsumer["direct"]`, and would leak nothing useful). Gate that relay so it is not an open
+Pythia-keyed relay under the automaton's attribution. Reference implementation (Mnemosyne, operator
+codex only): `app/api/pythia/relay/route.ts` (ancient-gated relay) + `app/codex/codexRelaySigningClient.ts`
+(the browser `signingClient`) + the `signingClient=` prop on the `<CodexProvider>` in
+`app/admin/codex/MnemosyneCodex.tsx`.
+
+**Embedded-Khronoton fires are the OTHER path** (§6 bullet 3): a consumer that runs its own Khronoton
+(Mnemosyne does) also submits scheduled fires direct-to-node via khronoton-core's chain runtime. Route
+those the same way — wrap the runtime's `submit` to relay through Pythia's `/stoachain/send` (the
+consumer analogue of Pythia's own `meterChainRuntime`). Do not assume the codex fix covers it — it is a
+separate submit seam.
