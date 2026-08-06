@@ -9,18 +9,40 @@ and get them approved before implementing. This is critical, load-bearing infras
 the root of the fleet (it feeds Pythia her nodes). Do NOT free-hand it.
 
 **Siblings:** `HANDOFF-mnemosyne-route-sends-through-pythia.md` and
-`HANDOFF-ouronetui-daimon-migration.md` — read them for the *normal* (relay) path and the standard UI
-migration shape. The Hub is DELIBERATELY DIFFERENT on metering (see §2–§3) — do NOT just route it
-through `/send` — but the UI/identity migration (§7) is the same shape as the others.
+`HANDOFF-ouronetui-daimon-migration.md` — read them for the *normal* (relay) path and the base UI
+migration shape. The Hub is DELIBERATELY DIFFERENT in two ways: on metering it REPORTS rather than relays
+(§2–§3, do NOT just route it through `/send`), and its UI has a **four-tier role hierarchy** split across
+the header (non-admins) and an Admin Dashboard (admins) (§7) rather than the two-login split the others
+use.
 
 ---
 
-## 0 · What the Hub becomes, and why it is special
+## 0 · What the Hub already IS, what it becomes, and why it is special
+
+**Start from the truth that the Hub is ALREADY a working automaton — this is a MIGRATION / re-shell,
+NOT a from-scratch build.** The Hub today already has:
+
+- **A Codex** (its own key vault) — already set up and holding real keys.
+- **Khronoton capabilities** — already-defined cronotons that fire (the Dalos Automaton).
+- **Admin-gated menus** — role-gated actions, today all on the same page.
+- **A deploy pipeline**, a running service, and existing UI.
+
+So do NOT re-create any of that. The job is to bring the EXISTING, working Hub **into the Pantheonic
+architecture**: its own Pythia connection + report-metering (§2–§6), the new Codex/Khronoton package
+lineage adopted **without disturbing the existing vault or cronotons** (§5, §5.1), and the Pantheonic UI
+shell with proper role-gated navigation (§7). Inventory what exists first; preserve it; re-shell around it.
 
 The Hub is an **automaton** in the Pantheonic sense — its Dalos Automaton signs/submits transactions and
 reads chain data, so per `organs/06 §6` (Pythia is the on-chain meter) that traffic must be **counted in
-Pythia's Pyth ledger** (transactions AND petitions/pondus). Like any automaton it gets its own **Codex**
-+ a **`DualLinkConnector`** minting an `x-pythia-key`, so its activity is keyed and attributed.
+Pythia's Pyth ledger** (transactions AND petitions/pondus). Like any automaton it gains its own
+**`DualLinkConnector`** (over its EXISTING Codex) minting an `x-pythia-key`, so its activity is keyed and
+attributed.
+
+> **Pythia side is DONE (shipped v2.7.31).** Everything §4 lists — the shared `pondus()` export in
+> `@ancientpantheon/pythia-client`, per-consumer petitions/pondus attribution, and the auth-gated
+> `POST /pyth/report` ingress — is already built, released, and live. The Hub agent is unblocked; §4 is
+> now a reference, not a wait. The operator just sets `PYTHIA_REPORTERS` to the Hub's consumer name to
+> open the ingress.
 
 But the Hub is **not** a normal consumer. Three things make it unique, and they drive the whole design:
 
@@ -97,10 +119,10 @@ Now the two round trips to kill:
 **How the pieces divide cleanly (no double-count, no round trip):**
 
 - **Pondus is a pure, shared function** — `pondus = classBase + sqrt(gasUsed)/2 + responseBytes/4096`
-  (the `sqrt` is per-request, which is why it must be computed by whoever served the read). Today it
-  lives in Pythia (`pyth/pondus.ts`). **PREREQUISITE: export it as a shared pure function** (see §4) so
-  the Hub computes byte-identical weights locally from its own `gasUsed`/`responseBytes`, without asking
-  Pythia.
+  (the `sqrt` is per-request, which is why it must be computed by whoever served the read). It is now
+  **exported from `@ancientpantheon/pythia-client`** as `pondus()` + `CLASS_BASE` (shipped v2.7.31) — the
+  Hub imports it and computes byte-identical weights locally from its own `gasUsed`/`responseBytes`,
+  without asking Pythia.
 - **XP attribution → done LOCALLY by the Hub** for its own reads (it owns the XP ledger + the nodes).
 - **Fleet-ledger accounting → reported ONE-WAY to Pythia** (petitions + pondus, keyed → `byConsumer`),
   for the fleet-wide odometer + the live pulse. Fire-and-forget.
@@ -116,50 +138,49 @@ Now the two round trips to kill:
 
 ---
 
-## 4 · PREREQUISITE (Pythia side): what Pythia must construct for this to work
+## 4 · Pythia side — DONE (shipped v2.7.31). Reference for what to wire against.
 
-Pythia has **no** "record traffic I did elsewhere" door today, and — importantly — she cannot yet
-attribute per-consumer **reads** at all (the `byConsumer` shipped in v2.7.30 is **transactions-only**).
-So the Hub migration is blocked on FIVE Pythia items (a Pythia nectar topic — the Pythia agent builds
-them). Items 1–4 are code; 5 is docs. Build in this order (each builds on the previous):
+**This whole section is already built, released, and live** — the Hub agent does NOT wait on it. What
+Pythia now exposes:
 
-1. **Per-consumer READ attribution (foundational — currently MISSING).** Extend the ledger's `ConsumerTx`
-   / `byConsumer` with `petitions` + `pondus`, and extend `recordRead(pondus)` → `recordRead(pondus,
-   consumer?)` so a keyed read credits its consumer. Today `byConsumer` only carries the four
-   transaction fields; the Hub's reported reads have nowhere to land without this. **Bonus:** this is
-   exactly the "petitions/pondus per API key" surface — once built it lights up for EVERY keyed consumer
-   on `/pyth` + the live pulse, not just the Hub.
-2. **Export the pondus formula as a shared pure function.** Lift `pyth/pondus.ts`'s `pondus()` +
-   `CLASS_BASE` into something the Hub can import (re-export from `@ancientpantheon/pythia-client`, or a
-   tiny shared module) so weight is computed identically on both sides. Pythia keeps using it internally;
-   the Hub imports it for local XP attribution.
-3. **A metering-report ingress, e.g. `POST /pyth/report`** (name TBD). Body: batched outcomes the
-   reporter performed — transactions `{ transactions: [{ gasLimit, accepted, count? }] }` AND reads
-   `{ reads: [{ gasUsed, responseBytes, count? }] }` (send RAW inputs and let Pythia recompute pondus via
-   item 2 — safer than trusting a reporter-supplied weight). Pythia records each via `recordSend(...)` /
-   `recordRead(...)` under the reporter's resolved consumer. **Records into the FLEET ledger ONLY — it
-   MUST NOT feed the per-slot usage report** (that would round-trip XP back to the Hub; §3).
-   - **No double-count:** a reported tx/read must NOT also be relayed through `/send`|`/read`.
-4. **A reporter-role authorization gate.** This ingress can inflate the ledger/economy, so it must NOT be
-   open. Resolve the consumer from `x-pythia-key`; accept reports ONLY from an authorized **reporter
-   role** (the Hub) — not any keyed consumer, never anonymous. Decide the gate in design (dedicated
-   reporter allow-list of consumer names / ancient-gated connector flag / distinct reporter credential).
-   Validate + bound every field (finite, non-negative, capped batch); malformed → clear 4xx, never
-   throws into the ledger.
+1. **Per-consumer READ attribution** — the ledger's `byConsumer` carries `petitions` + `pondus`;
+   `recordRead(pondus, consumer)` attributes keyed reads. (This also gave the fleet the per-API-key
+   petitions/pondus surface on `/pyth` + the live pulse.)
+2. **Shared `pondus()` + `CLASS_BASE`** — exported from **`@ancientpantheon/pythia-client`** (v2.7.31).
+   Import it in the Hub to weigh reads locally, identically to Pythia.
+3. **`POST /pyth/report`** — the metering-report ingress. Body:
+   `{ transactions?: [{ gasLimit, accepted, count? }], reads?: [{ gasUsed, responseBytes, count? }] }`.
+   Send RAW read inputs — Pythia recomputes pondus (a reporter can't inflate weight). Records into the
+   **FLEET ledger ONLY**, under the reporter's consumer (`byConsumer[...]`); it never feeds the per-slot
+   usage report and is not an operational path (so the gateway meter never double-counts it). Batch is
+   validated + bounded, all-or-nothing (any bad field → 400).
+4. **Reporter authorization gate** — closed by default. The endpoint accepts reports ONLY from a consumer
+   named in the env allow-list **`PYTHIA_REPORTERS`** (comma-separated); anyone else / anonymous → 403.
+   **Operator action:** set `PYTHIA_REPORTERS` to the Hub's resolved consumer identifier to open it.
+5. **(doc)** `organs/06 §6b` already documents the three-path metering model.
 
-5. **(doc)** Update `organs/06 §6` to the three-path metering model (§8).
-
-> The Hub's `x-pythia-key` resolving to the `"dalos"` consumer name uses Pythia's EXISTING connector
-> registration (`connectorStore.nameForKey`) — no new Pythia work there, just the Hub registering its
-> dual-link (§5) and confirming the name is `"dalos"`.
+> The Hub's `x-pythia-key` resolving to its consumer identifier uses Pythia's EXISTING connector
+> registration — the Hub registers its dual-link (§5) and confirms what name/account its key resolves to,
+> then that value goes in `PYTHIA_REPORTERS`. (An ephemeral key resolves to the smart-Apollo account; a
+> stored connector resolves to its configured name — confirm which, and allow-list that exact string.)
 
 ---
 
-## 5 · Hub-side migration (the automaton wiring)
+## 5 · Hub-side migration (the automaton wiring — over what ALREADY exists)
 
-- **Own Codex + connector.** Inventory where the Dalos signing keys live; hold them in the Hub's own
-  Codex (`@ancientpantheon/codex`). Wire a `DualLinkConnector` (`organs/06 §2e`, mirror Mnemosyne's
-  `connectorLoop.ts`) with its two linked Apollo halves, minting the `x-pythia-key` that keys its reports.
+> **CRITICAL — preserve the existing Codex and Khronoton state.** The Hub ALREADY has a working Codex
+> (holding real keys) and already-defined Khronoton cronotons (the Dalos Automaton). Adopting the new
+> `@ancientpantheon/codex` / `@ancientpantheon/khronoton-core` packages must **NOT** re-initialize, wipe,
+> or shadow them. **Capture the current vault + cronotons AS THEY ARE**, then migrate the code that
+> references them onto the new package APIs. Before touching anything: snapshot/back up the existing
+> Codex vault and the Khronoton store, and write a migration step that carries the exact existing keys +
+> cronoton definitions across (§5.1). A broken key or a lost cronoton here is a production incident — the
+> Dalos Automaton stops firing. Treat the existing data as immutable ground truth to be *carried*, not
+> *regenerated*.
+
+- **Connector over the EXISTING Codex.** The Hub already has its Codex — do not create a second one. Add
+  a `DualLinkConnector` (`organs/06 §2e`, mirror Mnemosyne's `connectorLoop.ts`) driven by the Hub's
+  existing keys / its two linked Apollo halves, minting the `x-pythia-key` that keys its reports.
 - **Keep all chain work direct-to-node.** Do NOT reroute Dalos submit/poll/read through Pythia. The Hub
   has the pool; it keeps using it. No change to the chain path, no new latency, no new dependency.
 - **Local XP attribution for its own reads** (§3): compute pondus with the shared function at read time;
@@ -181,6 +202,13 @@ The Hub's own Codex (§5) MUST be built on the NEW package **`@ancientpantheon/c
 **`@ouronet/ouronet-codex`** (https://www.npmjs.com/package/@ouronet/ouronet-codex). This migration is
 the moment to finish the Hub's move OFF the old package entirely:
 
+- **Preserve the existing vault across the package switch (see §5's CRITICAL box).** Moving from
+  `@ouronet/ouronet-codex` to `@ancientpantheon/codex` is a code/dependency change — it must carry the
+  Hub's EXISTING keys/vault across unchanged. Do NOT let the new package initialize a fresh vault over the
+  old one. If the on-disk vault format differs between packages, write an explicit one-time migration that
+  reads the old vault and writes it in the new format (with a verified back-up first); if it's the same
+  format, confirm the new package opens the existing vault byte-for-byte. Same principle for any
+  already-defined Khronoton cronotons carried onto `@ancientpantheon/khronoton-core`.
 - **Zero remaining imports** of `@ouronet/ouronet-codex` in the Hub after this migration — remove it from
   `package.json` and replace every usage with `@ancientpantheon/codex`. Grep the repo to confirm none
   linger (including transitive/dev usages and any vendored copy).
@@ -210,40 +238,85 @@ the moment to finish the Hub's move OFF the old package entirely:
 
 ---
 
-## 7 · Pantheonic UI + identity migration (same shape as the other entities)
+## 7 · Pantheonic UI migration — role hierarchy, admin dashboard, layout
 
-The Hub is primarily an operator/admin console, but it still adopts the full Pantheonic shell. (I don't
-have the Hub's current screens — **inventory the existing UI first**, then apply the standard migration.)
+The Hub already has role-gated menus, **today all crammed onto the same page**. The Pantheonic migration
+re-shells this into the standard 3-tier header for non-admins and a separate **admin dashboard** for
+admins. **Inventory the existing menus/actions first**, bucket each by role tier (below), then place it.
 
-- **3-tier Pantheonic Header** (`design/` §3): replace the current nav with Tier-1 sections + Tier-2
-  sub-views; the identity block; **every view URL-addressable** down to Tier-3 sub-tabs (`design/` §3.7).
-  Admin areas use the sidebar + content-pane layout (`design/` §5).
-- **Identity/login.** The Hub IS the AncientHub identity provider, so its operator console is inherently
-  the "admin" surface — gate operator/config views behind the ancient login natively (don't bolt on a
-  second scheme). Follow `identity/HANDOFF-consumer-ancienthub-login.md` for the presentation, adapted to
-  "this app hosts the login."
+### 7.1 · The four user tiers — a strict inclusion hierarchy
+
+Four categories, each INCLUDING everything the previous can do, plus its own gated actions:
+
+```
+Operator  ⊂  Baron  ⊂  Modern admin  ⊂  Ancient admin
+└─ non-admin ─┘        └────── admin ──────┘
+```
+
+- **Operator** (non-admin) — base tier.
+- **Baron** (non-admin) — everything an operator does **+ baron-only actions**.
+- **Modern admin** (ADMIN) — everything a baron does **+ modern-admin actions**.
+- **Ancient admin** (ADMIN) — everything a modern admin does **+ ancient-admin actions**.
+
+Model this as ordered levels (e.g. `operator=0, baron=1, modernAdmin=2, ancientAdmin=3`) with a single
+`can(user, minLevel)` check, so "includes the previous" is inherent — a baron passes every operator gate,
+an ancient admin passes every gate. Do NOT hand-enumerate per-tier allow-lists that duplicate lower tiers.
+
+### 7.2 · The admin/non-admin split drives WHERE things live (the core Pantheonic change)
+
+This is the heart of the migration and the biggest departure from today's "all on one page":
+
+- **Operators + barons are NON-admins.** Their actions live in the **3-tier Pantheonic Header** as normal
+  navigation (`design/` §3): Tier-1 sections, Tier-2 sub-views, Tier-3 sub-tabs — **every view
+  URL-addressable** (`design/` §3.7). A baron simply sees additional buttons/sections an operator does
+  not (gated by tier), but they're all in the same normal header nav.
+- **Modern + ancient admins are ADMINS.** Their actions do **NOT** sit inline in the normal page. They
+  move behind an **Admin Dashboard** — the sidebar + content-pane layout (`design/` §5) — reached from
+  the identity block's admin entry, itself shown only to admin-tier users. Inside the dashboard, modern-
+  vs ancient-only panes are gated by tier (an ancient admin sees the modern panes plus the ancient ones).
+- **Net:** non-admin capability → header nav; admin capability → admin dashboard. Nothing admin-gated
+  remains loose on the main page. This is exactly how the other Pantheonic entities separate the two
+  logins; the Hub's four tiers just fold onto the same two-surface split (non-admin header / admin pane).
+
+### 7.3 · Identity / login
+
+The Hub IS the AncientHub identity provider — it hosts the login the other entities *consume*. So the
+tier of the logged-in user is known natively; use it to (a) show/hide header sections for
+operator-vs-baron and (b) reveal the Admin Dashboard entry for modern/ancient admins. Don't bolt on a
+second auth scheme; drive everything off the Hub's existing identity + the tier level.
+
+### 7.4 · Layout — the core page width changes
+
+Adopt the Pantheonic work-area layout, which means the **core page content width changes** to the
+standard Pantheonic content column (see `design/` — the header + work-area shell the other entities use,
+e.g. Pythia's landing). The Hub's current full-bleed/legacy width is replaced by the Pantheonic
+header-over-work-area structure with the same content measure and the collapsible-portrait allowance
+where applicable. Build the **3-tier menu in the Pantheonic style** (the `.ph-tier1` / Tier-2 / L3 rows)
+rather than the current bespoke nav — the header IS the control surface.
+
+### 7.5 · The rest of the shell
+
 - **Update page (automaton variant)** (`automaton/04`/`05`): list the packages the Hub pulls —
-  `@ancientpantheon/codex`, `@ancientpantheon/pythia-client` (with versions) — and, since the Hub IS an
-  automaton, list **Khronoton with its version** (mark whether the Dalos Automaton actually runs on
-  Khronoton — **confirm this**; if Dalos uses its own scheduler, say so and show it instead). Keep the
-  existing changelog/version surface.
-- **Pythia connection status.** Add a connector-status panel/footer (masked `x-pythia-key` + depleting
-  TTL countdown), exactly like Mnemosyne's connector panel (`organs/06 §2e` presentation spec) — so the
-  operator can see the Hub's link to Pythia and whether reports are flowing.
-- **Preserve — re-shell, don't rewrite — the Hub's unique surfaces:** the **node-feed management** (the
-  pool it serves Pythia), the **operator / PythXP ledger** views, and the **Dalos Automaton controls**.
-  These stay functionally identical; they just move into the new header/routing/admin layout. The XP
-  ledger view now also reflects the Hub's own locally-attributed reads (§3).
+  `@ancientpantheon/codex`, `@ancientpantheon/pythia-client`, and **`@ancientpantheon/khronoton-core`**
+  (with versions) — since the Hub IS an automaton that runs Khronoton. Keep the existing
+  changelog/version surface and deploy-pipeline hooks.
+- **Pythia connection status.** Add a connector-status panel (masked `x-pythia-key` + depleting TTL
+  countdown), like Mnemosyne's connector panel (`organs/06 §2e`) — so an admin can see the Hub's link to
+  Pythia and whether reports are flowing. (Place it in the Admin Dashboard — it's operator/admin info.)
+- **Preserve — re-shell, don't rewrite — the Hub's unique surfaces**, bucketing each by tier: the
+  **node-feed management** (the pool it serves Pythia), the **operator / PythXP ledger** views, and the
+  **Dalos Automaton controls** and **deploy pipeline**. Functionally identical; they just move into the
+  header (non-admin views) or the Admin Dashboard (admin views) per §7.2. The XP ledger view now also
+  reflects the Hub's own locally-attributed reads (§3).
 
 ---
 
-## 8 · Also update the architecture doc
+## 8 · Architecture doc — already updated
 
-`organs/06 §6` currently frames metering as "route all traffic through Pythia's gateway." This migration
-generalizes it to **three** paths (relay / in-process seam / cross-process report), and adds the rule
-that an entity holding its own node access AND the XP ledger (the Hub) attributes XP locally and reports
-one-way — never round-tripping through Pythia's per-slot channel. The Pythia agent should land this doc
-update alongside the endpoint.
+`organs/06 §6b` now documents the three-path metering model (relay / in-process seam / cross-process
+report) and the rule that an entity holding its own node access AND the XP ledger (the Hub) attributes XP
+locally and reports one-way — never round-tripping through Pythia's per-slot channel. Nothing to do here;
+it's a reference.
 
 ---
 
@@ -253,21 +326,26 @@ update alongside the endpoint.
 - Changing the existing hub-feed (Hub → Pythia node pool) mechanism beyond confirming its independence.
 - Redesigning the PythXP economics — only *where* the Hub's own-read attribution is computed changes
   (locally, with the shared formula), not the reward math.
+- Re-creating the Codex, the Khronoton cronotons, the role model, or the deploy pipeline — they EXIST;
+  this is a migration that preserves and re-shells them, never a rebuild (§0, §5).
+- Changing what any tier is ALLOWED to do — the role capabilities are unchanged; only WHERE they render
+  (header vs admin dashboard) changes (§7).
 
 ---
 
 ## 10 · Acceptance criteria
 
-- [ ] Pythia's `byConsumer` carries per-consumer **petitions + pondus** (not just transactions), via a
-      `recordRead(pondus, consumer?)` — so keyed reads are attributed per consumer (also the "per-key
-      petitions/pondus" surface). This is the missing foundational piece (§4 item 1).
-- [ ] Pythia exports a shared `pondus()` the Hub imports, and an authorization-gated, keyed
-      metering-report ingress that records batched **transactions AND reads** into the fleet ledger's
-      aggregate + `byConsumer["dalos"]`, validated/bounded (recomputing pondus from raw inputs), with NO
-      feed into the per-slot usage report and NO double-count vs the gateway.
-- [ ] The Hub has its own Codex on **`@ancientpantheon/codex`** + a `DualLinkConnector` minting an
-      `x-pythia-key` — and **zero remaining imports of `@ouronet/ouronet-codex`** (grep-clean), so the
-      legacy package can be deprecated once the fleet is fully off it (§5.1).
+- [x] *(Pythia, DONE v2.7.31)* `byConsumer` carries per-consumer **petitions + pondus**; a shared
+      `pondus()` is exported from `@ancientpantheon/pythia-client`; the auth-gated `POST /pyth/report`
+      ingress records batched **transactions AND reads** into `byConsumer` (recomputing pondus), fleet-
+      ledger-only, no per-slot feed, no gateway double-count; `organs/06 §6b` documents it. — the Hub
+      wires against these.
+- [ ] **Existing state preserved:** the Hub's existing Codex vault and Khronoton cronotons are carried
+      onto `@ancientpantheon/codex` / `@ancientpantheon/khronoton-core` intact — no fresh vault, no lost
+      cronoton (verified against a pre-migration back-up), Dalos keeps firing throughout.
+- [ ] The Hub adds a `DualLinkConnector` over its EXISTING Codex minting an `x-pythia-key`, and has
+      **zero remaining imports of `@ouronet/ouronet-codex`** (grep-clean), so the legacy package can be
+      deprecated once the fleet is fully off it (§5.1).
 - [ ] The Hub keeps firing Dalos transactions AND doing reads direct-to-node (no reroute through Pythia).
 - [ ] The Hub attributes PythXP for its own reads LOCALLY (pondus via the shared formula); Pythia never
       sends those reads back.
@@ -279,11 +357,17 @@ update alongside the endpoint.
       deadlock).
 - [ ] Both the metering channels are disjoint: no read is both locally-XP-attributed AND round-tripped
       via Pythia's per-slot report (no double-XP).
-- [ ] The Hub uses the 3-tier Pantheonic Header with URL-addressable views (`design/` §3, §3.7); admin
-      uses the sidebar+pane; the Update page lists Codex + pythia-client + Khronoton (or the Dalos
-      scheduler); a Pythia connection-status panel is present; node-feed + XP-ledger + Dalos controls are
-      intact in the new shell.
-- [ ] `organs/06 §6` updated to the three-path metering model.
+- [ ] **Roles as a strict inclusion hierarchy** (`operator ⊂ baron ⊂ modern admin ⊂ ancient admin`)
+      driven by a single ordered `can(user, minLevel)` check — a higher tier passes every lower gate.
+- [ ] **Non-admin (operator/baron) actions live in the 3-tier Pantheonic Header** (URL-addressable,
+      `design/` §3/§3.7); **admin (modern/ancient) actions live behind an Admin Dashboard** (sidebar+pane,
+      `design/` §5), reached from an admin-only identity entry — NOTHING admin-gated remains loose on the
+      main page (the today-state is fixed).
+- [ ] The **core page width** is the Pantheonic work-area measure (header-over-work-area shell), and the
+      menu is built in the Pantheonic style (`.ph-tier1` / Tier-2 / L3) — not the legacy bespoke nav.
+- [ ] The Update page lists Codex + pythia-client + **khronoton-core** (versions); a Pythia
+      connection-status panel is present in the Admin Dashboard; node-feed + PythXP-ledger + Dalos
+      controls + deploy pipeline are intact, each bucketed into the header or the dashboard by tier.
 
 ## 11 · When done
 
