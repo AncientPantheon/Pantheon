@@ -116,30 +116,42 @@ Now the two round trips to kill:
 
 ---
 
-## 4 · PREREQUISITE (Pythia side): metering-report ingress + shared pondus
+## 4 · PREREQUISITE (Pythia side): what Pythia must construct for this to work
 
-Pythia has **no** "record traffic I did elsewhere" door today — she only meters what flows through her
-gateway. Two additions (a Pythia nectar topic — the Pythia agent builds them; may already be underway):
+Pythia has **no** "record traffic I did elsewhere" door today, and — importantly — she cannot yet
+attribute per-consumer **reads** at all (the `byConsumer` shipped in v2.7.30 is **transactions-only**).
+So the Hub migration is blocked on FIVE Pythia items (a Pythia nectar topic — the Pythia agent builds
+them). Items 1–4 are code; 5 is docs. Build in this order (each builds on the previous):
 
-1. **Export the pondus formula as a shared pure function.** Lift `pyth/pondus.ts`'s `pondus()` +
-   `CLASS_BASE` into something the Hub can import (e.g. re-export from `@ancientpantheon/pythia-client`,
-   or a tiny shared module) so weight is computed identically on both sides. Pythia keeps using it
-   internally; the Hub imports it for local XP attribution.
-2. **A metering-report ingress, e.g. `POST /pyth/report`** (name TBD). Body: batched outcomes the
+1. **Per-consumer READ attribution (foundational — currently MISSING).** Extend the ledger's `ConsumerTx`
+   / `byConsumer` with `petitions` + `pondus`, and extend `recordRead(pondus)` → `recordRead(pondus,
+   consumer?)` so a keyed read credits its consumer. Today `byConsumer` only carries the four
+   transaction fields; the Hub's reported reads have nowhere to land without this. **Bonus:** this is
+   exactly the "petitions/pondus per API key" surface — once built it lights up for EVERY keyed consumer
+   on `/pyth` + the live pulse, not just the Hub.
+2. **Export the pondus formula as a shared pure function.** Lift `pyth/pondus.ts`'s `pondus()` +
+   `CLASS_BASE` into something the Hub can import (re-export from `@ancientpantheon/pythia-client`, or a
+   tiny shared module) so weight is computed identically on both sides. Pythia keeps using it internally;
+   the Hub imports it for local XP attribution.
+3. **A metering-report ingress, e.g. `POST /pyth/report`** (name TBD). Body: batched outcomes the
    reporter performed — transactions `{ transactions: [{ gasLimit, accepted, count? }] }` AND reads
-   `{ reads: [{ petitions?, pondus }] }` (or raw `{ gasUsed, responseBytes }` and let Pythia recompute —
-   pick one in design; recomputing on Pythia's side is safer against a lying reporter). Pythia records
-   each via `recordSend(...)` / `recordRead(...)` under the reporter's resolved consumer — reusing the
-   per-consumer accounting shipped in v2.7.30 (`byConsumer`). **Records into the FLEET ledger ONLY — it
+   `{ reads: [{ gasUsed, responseBytes, count? }] }` (send RAW inputs and let Pythia recompute pondus via
+   item 2 — safer than trusting a reporter-supplied weight). Pythia records each via `recordSend(...)` /
+   `recordRead(...)` under the reporter's resolved consumer. **Records into the FLEET ledger ONLY — it
    MUST NOT feed the per-slot usage report** (that would round-trip XP back to the Hub; §3).
-   - **Keyed + authorization-gated.** This ingress can inflate the ledger/economy, so it must NOT be
-     open. Resolve the consumer from `x-pythia-key`; accept reports ONLY from an authorized **reporter
-     role** (the Hub) — not any keyed consumer, never anonymous. Decide the gate in design (dedicated
-     reporter allow-list / ancient-gated connector flag / distinct reporter credential).
-   - **Validated + bounded** (finite, non-negative, capped batch) so a bad/hostile report can't corrupt
-     the ledger. Malformed → clear 4xx, never throws into the ledger. If Pythia RECOMPUTES pondus from
-     raw inputs, a lying reporter can't inflate weight — prefer that.
    - **No double-count:** a reported tx/read must NOT also be relayed through `/send`|`/read`.
+4. **A reporter-role authorization gate.** This ingress can inflate the ledger/economy, so it must NOT be
+   open. Resolve the consumer from `x-pythia-key`; accept reports ONLY from an authorized **reporter
+   role** (the Hub) — not any keyed consumer, never anonymous. Decide the gate in design (dedicated
+   reporter allow-list of consumer names / ancient-gated connector flag / distinct reporter credential).
+   Validate + bound every field (finite, non-negative, capped batch); malformed → clear 4xx, never
+   throws into the ledger.
+
+5. **(doc)** Update `organs/06 §6` to the three-path metering model (§8).
+
+> The Hub's `x-pythia-key` resolving to the `"dalos"` consumer name uses Pythia's EXISTING connector
+> registration (`connectorStore.nameForKey`) — no new Pythia work there, just the Hub registering its
+> dual-link (§5) and confirming the name is `"dalos"`.
 
 ---
 
@@ -162,6 +174,25 @@ gateway. Two additions (a Pythia nectar topic — the Pythia agent builds them; 
     an XP attribution (XP is already done locally).
 
 ---
+
+### 5.1 · Complete the Codex migration — retire the OLD `@ouronet/ouronet-codex`
+
+The Hub's own Codex (§5) MUST be built on the NEW package **`@ancientpantheon/codex`**, not the legacy
+**`@ouronet/ouronet-codex`** (https://www.npmjs.com/package/@ouronet/ouronet-codex). This migration is
+the moment to finish the Hub's move OFF the old package entirely:
+
+- **Zero remaining imports** of `@ouronet/ouronet-codex` in the Hub after this migration — remove it from
+  `package.json` and replace every usage with `@ancientpantheon/codex`. Grep the repo to confirm none
+  linger (including transitive/dev usages and any vendored copy).
+- **Fleet-wide retirement goal.** The old package is being wound down across the Pantheon — OuronetUI and
+  the Explorer migrations already adopt `@ancientpantheon/codex`. The Hub is likely one of the last
+  holdouts (it predates the rename). **Once NO consumer depends on `@ouronet/ouronet-codex` anymore, it
+  can be safely DEPRECATED on npm** (`npm deprecate @ouronet/ouronet-codex "moved to @ancientpantheon/codex"`).
+- **Coordinate the deprecation, don't do it blind.** Before deprecating, verify (npm dependents + a fleet
+  grep) that Hub, OuronetUI, Explorer, Mnemosyne, and any pact/tooling repos are all off it. Report the
+  Hub's status so the operator can pull the deprecation trigger when the last consumer is clear.
+- Any Codex API differences between the two packages surface here — reconcile them as part of the Hub's
+  Codex/connector wiring (§5), not as a silent shim around the old surface.
 
 ## 6 · The load-bearing rules (do not violate — these prevent a bootstrap deadlock)
 
@@ -227,11 +258,16 @@ update alongside the endpoint.
 
 ## 10 · Acceptance criteria
 
+- [ ] Pythia's `byConsumer` carries per-consumer **petitions + pondus** (not just transactions), via a
+      `recordRead(pondus, consumer?)` — so keyed reads are attributed per consumer (also the "per-key
+      petitions/pondus" surface). This is the missing foundational piece (§4 item 1).
 - [ ] Pythia exports a shared `pondus()` the Hub imports, and an authorization-gated, keyed
       metering-report ingress that records batched **transactions AND reads** into the fleet ledger's
-      aggregate + `byConsumer["dalos"]`, validated/bounded, with NO feed into the per-slot usage report
-      and NO double-count vs the gateway.
-- [ ] The Hub has its own Codex + `DualLinkConnector` minting an `x-pythia-key`.
+      aggregate + `byConsumer["dalos"]`, validated/bounded (recomputing pondus from raw inputs), with NO
+      feed into the per-slot usage report and NO double-count vs the gateway.
+- [ ] The Hub has its own Codex on **`@ancientpantheon/codex`** + a `DualLinkConnector` minting an
+      `x-pythia-key` — and **zero remaining imports of `@ouronet/ouronet-codex`** (grep-clean), so the
+      legacy package can be deprecated once the fleet is fully off it (§5.1).
 - [ ] The Hub keeps firing Dalos transactions AND doing reads direct-to-node (no reroute through Pythia).
 - [ ] The Hub attributes PythXP for its own reads LOCALLY (pondus via the shared formula); Pythia never
       sends those reads back.

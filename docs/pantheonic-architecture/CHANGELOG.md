@@ -51,7 +51,7 @@ the full Pantheonic UI migration (3-tier header + URL routing, native ancient-lo
 automaton variant, Pythia connection-status panel) while re-shelling the Hub's unique surfaces (node-feed
 management, operator/PythXP ledger, Dalos controls). Load-bearing rules: Pythia-down never blocks the Hub;
 the node feed stays independent of the metering auth (no bootstrap deadlock); no double-count/double-XP.
-Directs generalizing `organs/06 §6` to the three-path model.
+Directs generalizing `organs/06 §6` to the three-path model. Refined with the full Pythia construction checklist — the Hub's reads force a NEW foundational piece: per-consumer READ attribution (petitions/pondus in `byConsumer` via `recordRead(consumer)`), which doubles as the long-requested per-API-key petitions/pondus surface — plus exported `pondus()`, the report ingress (txs + reads), and a reporter-role gate. Also mandates completing the Codex migration to `@ancientpantheon/codex` and removing the legacy `@ouronet/ouronet-codex` so it can be deprecated on npm once the fleet is fully off it.
 
 ## 2026-08-05 — new `HANDOFF-mnemosyne-route-sends-through-pythia.md`
 
