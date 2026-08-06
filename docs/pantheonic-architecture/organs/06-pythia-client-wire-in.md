@@ -578,6 +578,31 @@ enter it because they were never counted. Reference: `constructors/Pythia` —
 usageReporter}.ts` (the hub report), and `apps/pythia/src/automaton/khronoton/meteredRuntime.ts` (the
 automaton-fire seam — meters submit only).
 
+### 6b · THREE metering paths into the one ledger (relay / in-process seam / cross-process report)
+
+The "flow through Pythia" rule has **three** sanctioned shapes — all feed the SAME Pyth ledger. Pick by
+whether the entity has its own direct node access and what it would cost to route through the gateway:
+
+1. **Gateway RELAY** (default — normal consumers: OuronetUI, Explorer, Mnemosyne). No node access →
+   push reads/sends *through* Pythia's `/read`/`/send`; she meters as she serves. One hop, free.
+2. **In-process SEAM** (Pythia's own fires). Her Khronoton submits direct-to-node and records to the
+   ledger in-process via `meterChainRuntime` — she never calls her own HTTP endpoint.
+3. **Cross-process REPORT** (the **AncientHub / Dalos** — it *is* Pythia's node source). Routing its
+   traffic through the gateway would be a redundant round trip AND a dependency inversion (Pythia down
+   freezing the more-foundational Hub). So it fires/reads **direct-to-node** and sends Pythia a keyed,
+   batched, best-effort **metering report** (`POST /pyth/report`, allow-listed via `PYTHIA_REPORTERS`).
+   Pythia RECOMPUTES read pondus from the raw gas/bytes (a reporter can't inflate weight) and records
+   into the **fleet ledger ONLY** — never the per-slot usage report, because an entity that holds the
+   PythXP ledger AND its own nodes attributes XP **locally** (reporting it back would round-trip). The
+   shared `pondus()` is exported from `@ancientpantheon/pythia-client` so both sides compute identical
+   weights. See `HANDOFF-ancienthub-automaton-migration.md` and `apps/pythia/src/routes/pythReport.ts`.
+
+**Per-consumer attribution.** Every counted read AND send is now attributed to its consumer (the name
+from its `x-pythia-key`, `"direct"` for anonymous, `"pythia-self"` for Pythia's own fires, a reporter
+name like `"dalos"` for reports) in the ledger's `byConsumer` map — surfaced on `GET /pyth` and the live
+Activity pulse (per-key petitions / pondus / transactions). Reads keep their separate per-slot hub
+attribution unchanged.
+
 ### 6a · The trap when a consumer submits through a LOADED CODEX (do not guess this)
 
 A consumer that surfaces the codex-ouronet dashboard (`@ancientpantheon/codex`) — Mnemosyne, OuronetUI —

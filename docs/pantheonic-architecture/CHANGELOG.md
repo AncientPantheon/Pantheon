@@ -29,6 +29,17 @@ consumer's embedded-Khronoton fires are a SEPARATE submit seam needing the same 
 Mnemosyne `app/api/pythia/relay/route.ts` + `app/codex/codexRelaySigningClient.ts` +
 `app/admin/codex/MnemosyneCodex.tsx`.
 
+## 2026-08-06 — `organs/06 §6b`: three metering paths + per-consumer attribution
+
+Recorded the three sanctioned ways an entity's on-chain traffic reaches Pythia's ONE ledger, learned
+while building the Hub prerequisites: gateway RELAY (normal consumers), in-process SEAM (Pythia's own
+fires via `meterChainRuntime`), and cross-process REPORT (the AncientHub — it holds its own node access
+AND the PythXP ledger, so it fires/reads direct-to-node, attributes XP locally, and one-way reports to
+`POST /pyth/report`, fleet-ledger-only, never the per-slot channel; `pondus()` is exported from
+`@ancientpantheon/pythia-client` so both sides weigh identically). Also documented that every counted
+read AND send is now attributed per consumer in `byConsumer` (surfaced on `/pyth` + the live pulse as
+per-key petitions/pondus/transactions).
+
 ## 2026-08-06 — new `HANDOFF-ancienthub-automaton-migration.md`
 
 Full migration handoff for the **AncientHub** (which holds the **Dalos Automaton**) into the Pantheonic
