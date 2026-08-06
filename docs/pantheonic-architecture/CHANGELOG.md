@@ -31,19 +31,27 @@ Mnemosyne `app/api/pythia/relay/route.ts` + `app/codex/codexRelaySigningClient.t
 
 ## 2026-08-06 — new `HANDOFF-ancienthub-automaton-migration.md`
 
-Migration handoff for the **AncientHub** (which holds the **Dalos Automaton**) into the Pantheonic
-architecture — with a genuinely new metering pattern. The Hub is special: it IS Pythia's node source (it
-feeds her the node pool), so routing its Dalos transactions through Pythia's `/send` would be a redundant
-round trip AND a dangerous dependency inversion (Pythia down would freeze the more-foundational Hub). The
-resolution: the Hub **REPORTS** its transactions to Pythia rather than **RELAYING** them — the same
-philosophy as Pythia metering her OWN fires in-process (`meterChainRuntime`), one process further out as a
-cross-process report. Establishes **three** metering paths feeding the one Pyth ledger: gateway-relay
-(normal consumers), in-process seam (Pythia's own fires), cross-process report (the Hub). Requires a new
-Pythia-side prerequisite — an authorization-gated, keyed metering-report ingress (`POST /pyth/report`)
-that records batched tx outcomes into `byConsumer["dalos"]` (reusing v2.7.30's per-consumer accounting).
-Load-bearing rules: Pythia-down must never block the Hub (best-effort, bounded queue); the Hub→Pythia node
-feed must stay independent of the metering auth (no bootstrap deadlock); no double-count vs `/send`. Also
-directs generalizing `organs/06 §6` from one path to three.
+Full migration handoff for the **AncientHub** (which holds the **Dalos Automaton**) into the Pantheonic
+architecture — with a genuinely new metering pattern and the complete UI/identity migration. The Hub is
+special on three counts: it IS Pythia's node source (feeds her the pool), it IS the PythXP-ledger holder
+(Pythia reports usage to it), and it must survive Pythia being down (it is more foundational). Routing its
+Dalos traffic through Pythia's gateway would be a redundant round trip AND a dependency inversion.
+Resolution — the Hub **REPORTS** its traffic rather than **RELAYING** it (same philosophy as Pythia
+metering her own fires in-process via `meterChainRuntime`, one process out as a cross-process report),
+establishing **three** metering paths into the one ledger: gateway-relay (normal consumers), in-process
+seam (Pythia's own fires), cross-process report (the Hub). Kills BOTH round trips — for transactions AND
+for reads/PythXP: the Hub reads direct-from-node, computes pondus LOCALLY (shared pure formula, exported
+from Pythia), attributes PythXP itself (it holds the ledger + owns the nodes), and reports one-way to
+Pythia's FLEET ledger only — never fed back through Pythia's per-slot usage report (no double-XP).
+Corrects the tempting error of treating the Hub's reads like Pythia's own excluded dirty reads: they are
+genuine consumer reads (like Mnemosyne) that DO count and DO earn. Pythia prerequisites: export `pondus()`
+as shared, and add an auth-gated keyed metering-report ingress (`POST /pyth/report`, txs + reads) that
+records into `byConsumer["dalos"]` (reusing v2.7.30) and MUST NOT feed the per-slot report. Also covers
+the full Pantheonic UI migration (3-tier header + URL routing, native ancient-login admin, Update page
+automaton variant, Pythia connection-status panel) while re-shelling the Hub's unique surfaces (node-feed
+management, operator/PythXP ledger, Dalos controls). Load-bearing rules: Pythia-down never blocks the Hub;
+the node feed stays independent of the metering auth (no bootstrap deadlock); no double-count/double-XP.
+Directs generalizing `organs/06 §6` to the three-path model.
 
 ## 2026-08-05 — new `HANDOFF-mnemosyne-route-sends-through-pythia.md`
 
