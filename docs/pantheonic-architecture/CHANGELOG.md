@@ -29,6 +29,22 @@ consumer's embedded-Khronoton fires are a SEPARATE submit seam needing the same 
 Mnemosyne `app/api/pythia/relay/route.ts` + `app/codex/codexRelaySigningClient.ts` +
 `app/admin/codex/MnemosyneCodex.tsx`.
 
+## 2026-08-06 — new `HANDOFF-ancienthub-automaton-migration.md`
+
+Migration handoff for the **AncientHub** (which holds the **Dalos Automaton**) into the Pantheonic
+architecture — with a genuinely new metering pattern. The Hub is special: it IS Pythia's node source (it
+feeds her the node pool), so routing its Dalos transactions through Pythia's `/send` would be a redundant
+round trip AND a dangerous dependency inversion (Pythia down would freeze the more-foundational Hub). The
+resolution: the Hub **REPORTS** its transactions to Pythia rather than **RELAYING** them — the same
+philosophy as Pythia metering her OWN fires in-process (`meterChainRuntime`), one process further out as a
+cross-process report. Establishes **three** metering paths feeding the one Pyth ledger: gateway-relay
+(normal consumers), in-process seam (Pythia's own fires), cross-process report (the Hub). Requires a new
+Pythia-side prerequisite — an authorization-gated, keyed metering-report ingress (`POST /pyth/report`)
+that records batched tx outcomes into `byConsumer["dalos"]` (reusing v2.7.30's per-consumer accounting).
+Load-bearing rules: Pythia-down must never block the Hub (best-effort, bounded queue); the Hub→Pythia node
+feed must stay independent of the metering auth (no bootstrap deadlock); no double-count vs `/send`. Also
+directs generalizing `organs/06 §6` from one path to three.
+
 ## 2026-08-05 — new `HANDOFF-mnemosyne-route-sends-through-pythia.md`
 
 Sibling to the OuronetUI send-routing handoff, tailored to Mnemosyne: asks the Mnemosyne agent to verify
