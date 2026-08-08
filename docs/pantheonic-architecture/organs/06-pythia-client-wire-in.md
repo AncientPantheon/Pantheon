@@ -164,9 +164,24 @@ const connector = new PythiaConnector({
 
 const client = new PythiaClient({
   baseUrl: "https://pythia.ancientholdings.eu",
-  pythiaKey: connector.keyProvider(), // resolved fresh per request — no manual refresh loop
+  // RECOMMENDED (pythia-client ≥ 3.1.0): pass the refreshable key SOURCE, not a
+  // pre-called keyProvider() — this enables automatic 401 SELF-HEAL.
+  pythiaKey: connector.asKeySource(), // { get, invalidate }
+  // (legacy: `connector.keyProvider()` still works, but WITHOUT self-heal.)
 });
 ```
+
+**401 self-heal (pythia-client ≥ 3.1.0) — strongly recommended.** An ephemeral `x-pythia-key` can be
+orphaned out from under a live consumer — most commonly a **gateway restart/deploy** wiping the key, but
+also a lost store, a TTL edge, or a revoked link. The gateway then returns
+`401 { error: "invalid or expired connector key" }` while the consumer still thinks its key is valid, so
+every gated call fails until the local secret nears expiry. Wiring `pythiaKey: connector.asKeySource()`
+(works for both `PythiaConnector` and `DualLinkConnector`) makes `PythiaClient` **invalidate → re-mint →
+retry once** on exactly that 401 — recovering with no human re-link (activation is on-chain, so the
+re-mint succeeds). It's bounded (one retry; a second 401 surfaces) and concurrent 401s collapse to a
+single re-mint. This is the client half of the resilience story; Pythia's server also persists the
+ephemeral store across restarts (`EPHEMERAL_KEYS_FILE`), so the two are redundant — either alone recovers
+the common restart case.
 
 `connector.ensureSecret()` returns `{status:"pending"}` (not a thrown error) while step 3 of the
 lifecycle (§1b) is still in flight — a brand-new pair, or one whose proof hasn't both landed yet.
@@ -659,3 +674,63 @@ depth), NOT the on-chain command result, so a node-less consumer cannot fully di
 mined-but-FAILED fire from a successful one via poll alone — it treats mined as success. Closing this
 needs Pythia's `/poll` to return the command result (or a listen-equivalent). Metering is unaffected:
 the transaction counts the moment its `submit` reaches `/stoachain/send`.
+
+---
+
+## 7 · The ephemeral key is NOT durable — you MUST self-heal on 401 (mandatory)
+
+**Incident that motivates this (2026-08-08):** every OuronetUI write failed with
+`Signing failed during transaction execution: invalid or expired connector key` on dev, master and
+localhost at once — while the connector panel still showed the key **active with ~2h left**. The
+gateway was healthy (`HTTP 200`); it had simply **restarted** (a release deploy).
+
+### 7a · Why an "active" key can be dead
+
+- The gateway validates `pk_eph_…` keys against an **in-memory** `EphemeralKeyStore` (`new Map()`,
+  hash-only, no persistence). A gateway **restart wipes it**, orphaning every ephemeral key minted
+  before the restart. (Permanent `pk_live_` admin keys persist; ephemeral ones do not.)
+- The "expires in …" you see in the panel is the connector's **local** view (`status().expiresAt`
+  returned at mint time). It does NOT prove the gateway still holds the key. After a gateway restart
+  the local countdown keeps ticking on a key the gateway has already forgotten.
+- The connector **caches the secret until near expiry** — `ensureSecret()` returns the cached secret
+  with no network call until inside `refreshMarginMs` (~5 min before expiry). **A 401 does not, by
+  itself, trigger a re-mint.** So a naive consumer keeps presenting a dead key for hours.
+
+Read: **treat the gateway's 401 as the source of truth, never the local expiry.**
+
+### 7b · The mandatory pattern — 401 ⇒ invalidate ⇒ re-mint ⇒ retry once
+
+Wire your gated calls (`/read`, `/send`, `/poll`) so that a response of **`401` with body
+`{ "error": "invalid or expired connector key" }`** autonomously:
+
+1. **invalidates** the connector's cached secret (force it to drop the dead key),
+2. **re-mints** — `await` a forced `ensureSecret()` / `refresh()` (this succeeds without any human
+   re-link, because **activation is on-chain**; see §1),
+3. **retries the original request exactly once** with the new key.
+
+Bound it to **one** retry per request (never loop). If the re-mint returns `202 pending` (the
+gateway's on-chain mirror is cold for one poll cycle right after a restart) or the retry still 401s,
+surface the error — the connector heartbeat converges and the next call succeeds. Concurrent 401s must
+collapse to **one** re-mint (the connector's `refresh()` is in-flight-deduped — rely on it).
+
+This is exactly the OAuth "401 ⇒ refresh token ⇒ retry" reflex. It is **not** optional: without it,
+every Pythia gateway deploy silently breaks your writes for up to the ephemeral TTL (~6 h).
+
+### 7c · Where it lives
+
+The self-heal belongs in the **shared `@ancientpantheon/pythia-client`** so every consumer inherits it
+(see `HANDOFF-pythia-ephemeral-key-restart-selfheal.md`): the connector exposes `invalidate()` and
+`PythiaClient`'s transport does the 401-retry. On the daimon side you then pass the **connector (or a
+refreshable `{get, invalidate}` provider)** into `PythiaClient` — **not** a pre-resolved key string
+(`connector.keyProvider()` called once eagerly), or the client has nothing to refresh.
+
+> OuronetUI's `getGatedPythiaClient()` builds `new PythiaClient({ pythiaKey: connector.keyProvider() })`
+> per request. Until it passes a refreshable source, its only recoveries are: **wait ~6 h** for the
+> local secret to near expiry, **Un-link → re-Link** the dual-api-key (forces a fresh mint), or
+> **restart the backend** (cold start re-activates from the persisted link). The permanent fix is 7b.
+
+### 7d · Operator playbook (until 7b ships)
+
+Gateway just deployed and writes 401 with an "active" key? On the Pythia Connector panel:
+**Un-link → paste the dual-api-key → Link** to mint a fresh key the restarted gateway recognises. The
+masked key changes and "expires in" resets — then writes work again. Do it per environment.
