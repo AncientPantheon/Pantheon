@@ -593,6 +593,56 @@ enter it because they were never counted. Reference: `constructors/Pythia` —
 usageReporter}.ts` (the hub report), and `apps/pythia/src/automaton/khronoton/meteredRuntime.ts` (the
 automaton-fire seam — meters submit only).
 
+### 6a · Consumer conformance: when Pythia is the transport, ALL reads route through her
+
+The metering above only works if consumers actually SEND their reads to Pythia. The load-bearing rule
+for any consumer (Mnemosyne, OuronetUI, StoaExplorer, future daimons) whose default transport is a
+Pythia connection:
+
+**Every chain read — INCLUDING the plain queries a UI runs to DISPLAY data (account state, codex
+balances/keys, table rows, "load a codex and show it") — MUST go through Pythia's `/read`, keyed with
+the connector's `x-pythia-key`. Reading a chain node directly while a Pythia connection is the default
+transport is a conformance bug: the read is unmetered, unattributed, and the consumer is invisible in
+the fleet ledger (no petitions under its Apollo account) despite an active connector.**
+
+There is exactly ONE legitimate node-direct read: the **pre-broadcast transaction SIMULATE** — a
+`/local` of a *fully-signed* command whose `keys-all`/guard must see the tx's declared signers. Pythia's
+`/read` is **signer-less by construction** (`apps/pythia/src/chainweb/localCommand.ts` `buildLocalCommand`
+sets `signers: []`, `sigs: []` — it is a keyless dirty read of `code` + `data`), so routing a guarded
+simulate through it would fail the keyset guard. That one lane — and only that lane — may go node-direct;
+it is unmetered on purpose, because the **SUBMIT** that follows is what gets metered (through Pythia's
+`/send`).
+
+Do NOT generalize that exception to plain reads. A display/query read carries **no signers**, so Pythia's
+signer-less `/read` serves it perfectly — it must route through Pythia. Conflating "guarded tx simulate"
+with "any read" and node-directing both is the exact bug that makes a consumer vanish from the meter.
+(`meterChainRuntime`'s pass-through of `dirtyRead` concerns PYTHIA'S OWN pre-fire simulate — it is NOT a
+licence for a consumer to node-direct its display reads.)
+
+**Conformance check** for any consumer: with the connector active and transport = Pythia, open a data
+view and confirm a petition lands under your Apollo account in Pythia's `/pyth` `byConsumer`. If it
+doesn't, a read path is bypassing the gateway — find it and route it through `/read`.
+
+**Where the display-read seam actually is (codex-ouronet consumers).** The trap is subtle because the
+codex's display reads do NOT go through the `ChainConnection` or the `signingClient` — they go through
+`@stoachain/stoa-core/reads` `pactRead`, which routes to whatever reader was installed via
+`setPactReader(fn)` at boot. **Uninstalled, `pactRead` falls back to the default NODE-DIRECT reader
+(`rawCalibratedDirtyRead`)** — so a consumer that wires the Pythia connection for sends but never calls
+`setPactReader` silently node-directs every display read and never appears in `byConsumer` (exactly the
+Mnemosyne bug). Fix, per surface:
+
+1. **`setPactReader(<pythia reader>)` at each codex mount** — the reader POSTs `{ code }` to Pythia's
+   `/read`: keyed via the consumer's own auth-gated relay for an operator surface, or keyless
+   browser-direct to `{pythiaUrl}/stoachain/read` for a public surface. Break-glass (Network Fallback
+   direct-node) delegates to the node reader.
+2. **Split the `signingClient`'s `dirtyRead` by signers** — a command that DECLARES signers is a signed-tx
+   SIMULATE → node-direct `/local`; a command with none is a display read → Pythia keyed `/read`.
+
+**Mnemosyne shipped both as of v0.14.0 (2026-08-09).** Reference: `app/codex/codexRelaySigningClient.ts`
+(`createCodexRelayPactReader` / `createCodexDirectPythiaPactReader` + the `commandHasSigners` lane split),
+installed via `setPactReader` in `app/admin/codex/MnemosyneCodex.tsx` (keyed relay) and
+`app/codex/CodexApp.tsx` (keyless direct). Reference shape for the OuronetUI + Explorer audits.
+
 ### 6b · THREE metering paths into the one ledger (relay / in-process seam / cross-process report)
 
 The "flow through Pythia" rule has **three** sanctioned shapes — all feed the SAME Pyth ledger. Pick by

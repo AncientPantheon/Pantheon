@@ -2,6 +2,30 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-09 — `organs/06` §6a: Mnemosyne shipped display-read routing (the `setPactReader` seam)
+
+Mnemosyne v0.14.0 fixed the §6a conformance bug (its Apollo never appeared in `/pyth` byConsumer). Root
+cause pinned: codex display reads go through `@stoachain/stoa-core/reads` `pactRead`, which routes to the
+reader installed via `setPactReader` — and Mnemosyne never installed one, so reads fell to the default
+NODE-DIRECT reader. Fix (documented in §6a as the reference shape for the OuronetUI + Explorer audits):
+install a Pythia reader at each codex mount (`setPactReader`) — keyed relay `/read` for the operator
+surface, keyless browser-direct for the public one — AND split the signing client's `dirtyRead` by
+signers (display read → Pythia `/read`; signed-tx simulate → node-direct `/local`). Clarifies that the
+display-read seam is `pactRead`/`setPactReader`, NOT the `ChainConnection` or `signingClient`.
+
+## 2026-08-09 — `organs/06` §6a: consumer read-routing conformance (display reads MUST go through Pythia)
+
+Added §6a making explicit the consumer-side rule the metering principle (§6) assumed but never stated:
+when a consumer's default transport is a Pythia connection, **every** chain read — including the plain
+display/query reads a UI runs to show data (loading a codex, account/balance/table views) — must route
+through Pythia's `/read` (keyed). The ONLY legitimate node-direct read is a guarded pre-broadcast tx
+SIMULATE (a `/local` of a fully-signed command whose keyset guard needs the signers Pythia's signer-less
+`/read` strips — `buildLocalCommand` sets `signers: []`/`sigs: []`). Node-directing plain reads is a
+conformance bug: the consumer is invisible in the meter despite an active connector. Prompted by
+Mnemosyne's codex read lane node-directing display reads (`dirtyRead`) in *both* transport modes; an
+audit item is raised for OuronetUI (does it node-direct any display read?). No Pythia-side change — its
+`/read` already serves signer-less reads; the fix is consumer-side routing.
+
 ## 2026-08-08 — `organs/06` §7: Mnemosyne shipped ephemeral-key self-heal (§7c linkage + §7e proxy wrapper)
 
 Closed the "Mnemosyne implementers" callout in §7e. Mnemosyne v0.13.0 wires `getGatedPythiaClient()`
