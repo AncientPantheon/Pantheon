@@ -724,13 +724,53 @@ The self-heal belongs in the **shared `@ancientpantheon/pythia-client`** so ever
 refreshable `{get, invalidate}` provider)** into `PythiaClient` — **not** a pre-resolved key string
 (`connector.keyProvider()` called once eagerly), or the client has nothing to refresh.
 
-> OuronetUI's `getGatedPythiaClient()` builds `new PythiaClient({ pythiaKey: connector.keyProvider() })`
-> per request. Until it passes a refreshable source, its only recoveries are: **wait ~6 h** for the
-> local secret to near expiry, **Un-link → re-Link** the dual-api-key (forces a fresh mint), or
-> **restart the backend** (cold start re-activates from the persisted link). The permanent fix is 7b.
+> **OuronetUI shipped 7b as of v2.3.0 (2026-08-08)** — but via the *consumer-side* variant in **§7e**,
+> not the built-in `asKeySource()` path. It still builds `new PythiaClient({ pythiaKey:
+> connector.keyProvider() })` per request; the self-heal lives in a wrapper around its own gated proxy
+> endpoints, because the key-miss reached it as a **returned body / re-thrown app error, not a clean
+> transport 401** (so the built-in transport heal never saw it). Either approach satisfies 7b — but a
+> consumer that **proxies gated calls through its own backend** (OuronetUI, Mnemosyne, Explorer) will
+> likely need **§7e** in addition to, or instead of, `asKeySource()`.
 
 ### 7d · Operator playbook (until 7b ships)
 
 Gateway just deployed and writes 401 with an "active" key? On the Pythia Connector panel:
 **Un-link → paste the dual-api-key → Link** to mint a fresh key the restarted gateway recognises. The
 masked key changes and "expires in" resets — then writes work again. Do it per environment.
+
+### 7e · Consumer-side redundancy — when the key-miss surfaces as a BODY, not a clean 401 (the shipped OuronetUI pattern)
+
+§7c's built-in path (`pythiaKey: connector.asKeySource()`) only fires when **`PythiaClient`'s own
+`fetch` sees a transport-level `HTTP 401`**. That is the right default. But a consumer that **proxies
+gated calls through its own backend** (OuronetUI, Mnemosyne, Explorer all do) frequently does NOT get a
+clean 401 at the layer where it can retry: the gateway's `{ error: "invalid or expired connector key" }`
+comes back inside a **200-wrapped body**, or the signing / relay pipeline re-throws it as an app-level
+error (`"Signing failed during transaction execution: invalid or expired connector key"`). The built-in
+transport heal never sees that, so writes stay broken until the ~6 h TTL — exactly the §7 incident.
+
+**Fix: a belt-and-suspenders wrapper around your own gated endpoints.** Shipped in OuronetUI v2.3.0 —
+reference `server/lib/pythia/connectorClient.ts` + `server/index.ts`:
+
+1. **Detect by MESSAGE, in both directions.** `isConnectorKeyMiss(v)` → true if the substring
+   `"invalid or expired connector key"` appears in a **thrown error** OR in a **returned body/value**.
+   Match on the message, not the HTTP status — the status is usually gone by the time it reaches you.
+2. **`resetGatedConnector()` — drop the memoized connector.** If you memoize the connector per process
+   (to avoid re-proving every request), that memo caches the **dead ephemeral secret**;
+   `DualLinkConnector.keyProvider()` only re-mints near expiry, so you MUST drop the memo to force a
+   rebuild. Also call this on **link / unlink** so a re-link always re-mints.
+3. **`healGatedConnector()` — reset + force a re-mint, single-flighted.** Drop the memo, rebuild the
+   connector, and `await connector.keyProvider()()` once to pull a fresh secret *now* (don't wait for
+   the expiry margin). Collapse concurrent heals to one in-flight re-mint.
+4. **`withConnectorSelfHeal(fn)` — wrap each gated call.** Run `fn`; if the **result** OR a **thrown
+   error** `isConnectorKeyMiss`, `await healGatedConnector()` and retry `fn` **exactly once** (never
+   loop). Wrap `/stoachain/read`, `/stoachain/send`, and any other gated proxy route.
+
+This is **redundant on purpose**. Three independent layers now recover a gateway restart: the gateway's
+persisted store (`EPHEMERAL_KEYS_FILE`, server side), the built-in `asKeySource()` transport heal (§7c,
+client side), and this **body-level consumer wrapper** (§7e, proxy side). Any one alone fixes the common
+case; together they make writes survive a Pythia deploy no matter *how* the key-miss surfaces.
+
+> **Mnemosyne & Explorer implementers:** you both proxy gated traffic through your own backends, so the
+> key-miss will reach you as a body / re-thrown error just as it did OuronetUI. Add the §7e wrapper at
+> your consumer level (detect-by-message → reset memo → force re-mint → retry once), and reset the
+> connector on link/unlink. Copy OuronetUI's four helpers as the reference shape.
