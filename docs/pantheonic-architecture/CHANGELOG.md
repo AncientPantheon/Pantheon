@@ -2,6 +2,16 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-08 — `organs/06` §7: Mnemosyne shipped ephemeral-key self-heal (§7c linkage + §7e proxy wrapper)
+
+Closed the "Mnemosyne implementers" callout in §7e. Mnemosyne v0.13.0 wires `getGatedPythiaClient()`
+with `connector.asKeySource()` (pythia-client `^3.1.0`) for the built-in transport 401 heal (§7c), AND —
+because it proxies gated calls (the key-miss arrives as a body / re-thrown error, not a clean 401) — adds
+the §7e consumer wrapper (`isConnectorKeyMiss` / `resetGatedConnector` / `healGatedConnector` /
+`withConnectorSelfHeal`) around every gated proxy call (`/api/pythia/relay` send/read/poll + the embedded
+Khronoton runtime's submit/poll), resetting the connector on link/unlink. Documented as the reference
+shape for the Explorer implementer.
+
 ## 2026-08-05 — `organs/06` §6a expanded: the rule is ABSOLUTE — reads, simulations, sends AND autonomous fires, all through Pythia
 
 Clarified (from Mnemosyne's `pythia-write-routing`, taken to full conformance) that §6 leaves nothing on

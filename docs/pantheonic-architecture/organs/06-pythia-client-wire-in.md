@@ -774,3 +774,10 @@ case; together they make writes survive a Pythia deploy no matter *how* the key-
 > key-miss will reach you as a body / re-thrown error just as it did OuronetUI. Add the §7e wrapper at
 > your consumer level (detect-by-message → reset memo → force re-mint → retry once), and reset the
 > connector on link/unlink. Copy OuronetUI's four helpers as the reference shape.
+>
+> **Mnemosyne shipped both layers as of v0.13.0 (2026-08-08).** §7c: `getGatedPythiaClient()` wires
+> `connector.asKeySource()` (pythia-client `^3.1.0`). §7e: the four helpers in
+> `lib/pythia/connectorClient.ts` (`isConnectorKeyMiss` / `resetGatedConnector` / `healGatedConnector`
+> single-flighted / `withConnectorSelfHeal`), wrapping every gated proxy call — `/api/pythia/relay`
+> (send/read/poll) AND the embedded Khronoton runtime's submit/poll — and resetting the connector on
+> link/unlink. Reference shape for Explorer.
