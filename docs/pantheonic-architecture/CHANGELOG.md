@@ -2,6 +2,19 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-10 — `automaton/05` §5: deploy progress is now a per-phase STEP LIST (supersedes chip · Step N/M · pacman)
+
+Rewrote §5 (the client progress display) for the cleaner step-list model StoaExplorer proved out and
+Pythia adopted: the five §4 phases (`Pulling source` / `Building image` / `Starting container` /
+`Verifying health` / `Cutting over`) render as a step list — done ● / active spinning ring / pending ○
+— with **per-step + total elapsed**, driven by the deployer's own `N/5 · <title>` phase markers (the
+middot distinguishes them from docker's `Step N/M`). A failed deploy turns the active step ✕ red and
+leaves later steps pending, so *which* phase failed is obvious. The always-moving guarantee (§0) is now
+the active-step CSS spinner + its live-ticking per-step timer, replacing the full-width "pacman"
+heartbeat. The raw build log moved under a `▸ Full log` `<details>`, collapsed by default. Updated the
+§1 panel sketch, the §5c stall note, and the §8 conformance checklist. Reference impl: Pythia
+`apps/pythia/public/{admin.html,admin.js,styles.css}`.
+
 ## 2026-08-09 — `organs/06` §6a: Mnemosyne shipped display-read routing (the `setPactReader` seam)
 
 Mnemosyne v0.14.0 fixed the §6a conformance bug (its Apollo never appeared in `/pyth` byConsumer). Root

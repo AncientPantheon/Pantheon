@@ -48,9 +48,10 @@ sidebar layout are already standard).
 │   (blue-green port-juggle explainer)                        │
 │   [ Deploy ]                                                │
 │   ── progress (only while/after a deploy) ──                │
-│   (RUNNING) Step 32/35                              8m18s   │
-│   · · · · · · · ᗧ · · · · · · · · · · · · · · · · · · · ·   │
-│   ┌ black box: streamed build log ─────────────────────────┐│
+│   Running…                                    2m 41s elapsed │
+│    ● Building image           1m 45s  ◐ Starting container … │
+│    ○ Verifying health   —     ○ Cutting over   —            │
+│   ▸ Full log  (collapsed streamed build log)                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -276,34 +277,60 @@ validation failure both **abort without touching the live color** and say so.
 
 ## 5 · The progress display (client)
 
-Shown while a deploy runs and after it ends. Four elements, above the log terminal.
+Shown while a deploy runs and after it ends — a per-phase **step list** driven by §4's phase markers,
+above a collapsed full-log terminal. (This supersedes the earlier "status chip · `Step N/M` · pacman
+heartbeat" model: a step list + a live per-step timer reads as clearer, honest progress, anchored to
+real phases rather than a purely decorative loop.)
 
-### 5a · Status chip · step · timer
+```
+Running…                                              2m 41s elapsed
+ ●  Pulling source                                               1s
+ ●  Building image                                            1m 45s
+ ◐  Starting container                                           12s
+ ○  Verifying health                                              —
+ ○  Cutting over                                                  —
+ ▸ Full log
+```
 
-- **Chip** — `RUNNING` (accent) → `SUCCESS` (green) / `FAILED` (red).
-- **Step** — parse the builder's `Step N/M` out of the streamed chunks and show the **latest** match.
-  This is real progress; it is not synthesized.
-- **Timer** — ticks every **1s** from `startedAt`, formatted `8m18s`. Client-driven, so it moves even
-  if the network stalls (that alone tells you the page is alive).
+### 5a · The step list — one row per phase
 
-### 5b · The heartbeat animation ("pacman")
+The five §4 phases become five step rows (`Pulling source` / `Building image` / `Starting container`
+/ `Verifying health` / `Cutting over`). As each `N/5 · …` phase marker arrives in the SSE stream,
+**advance** the list: mark every earlier step **done ●** (with its measured duration), the new one
+**active** (a spinning ring), and leave later ones **pending ○** (hollow, muted). On a **failed**
+deploy the active step turns **✕ red** and the steps below it stay pending — so *which* phase failed
+is obvious at a glance.
 
-A looping animation modelled on the CachyOS/pacman package updater: a muncher glyph travels across a
-field of dots on a continuous loop while the deploy runs.
+- **Header** — a title on the left (`Running…` → `Deployed in 2m 41s` / `<status> after …`) and the
+  **total elapsed** on the right (`2m 41s elapsed`, ticks every **1s** from `startedAt`, client-driven
+  so it moves even if the network stalls).
+- **Per-step time** — each done step shows its own measured duration; the **active** step *live-ticks*
+  its running time (so even a multi-minute `Building image` visibly moves). Pending → `—`.
+- Parse off the **phase markers**, not synthesized — the middot in `N/5 · <title>` distinguishes them
+  from the builder's own `Step N/M` lines (advance to the highest phase seen in each chunk).
 
-- Pure CSS keyframes, `infinite` — no JS timer, no data dependency, always smooth.
-- On **done**: stop the animation and park the muncher at the end.
-- On **stall** (§5c): **pause** the animation and turn it red — this is the moment the operator
-  learns the deploy is stuck.
+### 5b · The active-step spinner (the always-moving guarantee)
 
-*Its honesty comes from §5c: it is not merely decorative, because the stall watchdog stops it.*
+The active step's dot is a CSS-spun ring (`infinite` keyframes — no JS timer, no data dependency) AND
+its per-step time ticks every second, so there is always motion **caused by the deploy** (§0's rule).
+This is what the earlier full-width "pacman" heartbeat provided; a phase-anchored spinner + a live
+timer is the same guarantee, made legible.
+
+- On **done**: the active step becomes a filled dot and the header shows the total.
+- On **stall** (§5c): the panel reddens and shows the watchdog note (the CSS spinner keeps turning, but
+  the stall message is the real signal).
+
+### 5f · Full log — collapsed by default
+
+The raw streamed build log lives under a `▸ Full log` `<details>`, **collapsed by default**. The step
+list is the at-a-glance view; the log is one click away for byte-level detail, and still tails live.
 
 ### 5c · Stall watchdog
 
 Track the timestamp of the last received chunk. With a ~6s server heartbeat, a healthy deploy never
 exceeds it. If **> 20s** elapses with no chunk:
 
-- add a stalled state (red border, paused animation), and
+- add a stalled state (red panel border), and
 - show: `⚠ no output for Ns — the host deployer may have stopped.`
 
 Clear it the moment a chunk arrives. **Threshold must be ≥ 3× the heartbeat interval** so ordinary
@@ -380,7 +407,8 @@ An implementation is conformant when:
 - [ ] The stream survives the color swap (log on the shared volume; client clears on reconnect).
 - [ ] The host deployer **heartbeats ~6s** and kills the ticker on every exit path.
 - [ ] Success states the **total elapsed**.
-- [ ] The panel shows **chip + Step N/M + ticking timer + looping heartbeat animation**.
+- [ ] The panel shows a **per-phase step list** (done ● / active spinner / pending ○) with **per-step
+      + total elapsed**, driven by the `N/5 · …` phase markers, above a **collapsed `▸ Full log`**.
 - [ ] A **>20s** output silence visibly stalls the display with an explanatory line.
 - [ ] The panel **auto-attaches** to a running deploy it did not trigger.
 - [ ] Success **auto-reloads** (with `no-cache` static assets); failure does not.
