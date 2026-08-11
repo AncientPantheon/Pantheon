@@ -120,6 +120,10 @@ neighbor; **set `peek={false}` for the true "one full pane, swipe to the next" f
 `initialIndex` (open on a chosen pane, e.g. the last). Indicator dots are tappable; the active pane
 is tracked from scroll position.
 
+**Put controls BELOW the deck, never overlaying it.** Side-anchored (`absolute left/right`) arrows sit
+on top of the pane and obscure the data underneath — put the ‹ › arrows in a row with the dots *below*
+the deck instead.
+
 *Reference:* `src/components/ui/SwipeDeck.tsx`.
 
 ---
@@ -163,7 +167,10 @@ content, a **tall** one fills the screen and scrolls the body. **Do not force `h
 fixed full height leaves dead space below a short modal (the modal's own background filling the screen
 under the content). Do the heavy lifting in CSS with `!important` at the mobile breakpoint (`height:
 auto; min-height: 0; max-height: 100dvh; overflow-y: auto`); keep the component's inline styles in
-agreement (no forced min-height).
+agreement (no forced min-height). **Gotcha (react-modal):** the content element keeps a default
+`bottom: 40px`, which — even with `height: auto` — stretches the sheet to nearly full height and
+recreates the dead space. **Top-anchor it explicitly** (`position: fixed; inset: 0 0 auto 0`) so
+`bottom` resolves to `auto` and the sheet is genuinely content-tall.
 
 *Reference:* `src/assets/styles/components/_dialog.css` (mobile full-screen block),
 `src/components/ui/Modal/Modal.tsx`.
