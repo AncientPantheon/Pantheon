@@ -17,6 +17,8 @@ Read in this order:
 1. **[`design/`](./design)** — how it must *look and feel*: the fixed content width, the shared
    colour-token contract (swap values, keep names), the standardized **Pantheonic Header**, and the
    **sidebar + content-pane admin** layout. This is what makes the family instantly recognizable.
+   **On phones, see [`mobile/`](./mobile)** — the app-shell + fixed-zone standard that turns these
+   same sites into native-feeling phone apps (fixed frame, no page scroll/zoom, swipeable zones).
 2. **[`automaton/`](./automaton)** — how an automaton is *structured*: the Pantheonic Automaton
    Blueprint (container, tokenless deploy, AncientHub login, versioning), the master-key
    sealed-vault crypto every automaton reuses, and the **Deploy Panel standard** (status readout +
@@ -44,7 +46,8 @@ Read in this order:
 
 | Section | Holds | Status |
 |---|---|---|
-| `design/` | width · tokens · header · admin layout · theming | the UI/UX standard |
+| `design/` | width · tokens · header · admin layout · theming | the desktop UI/UX standard |
+| `mobile/` | app-shell frame · `min-h-0` chain · `SwipeDeck` · page-conversion recipe · full-screen modals | the mobile UI standard |
 | `automaton/` | the blueprint · master-key sealed-vault · deploy-panel + progress standard | how to build an automaton |
 | `identity/` | SSO · consumer-login · Apollo verifier · **how an entity becomes a Pythia verifier** | login/verification everywhere |
 | `organs/` | package blueprint · khronoton wire-in · codex re-key · consumer integration · **pythia-client connector wire-in** · dependency contract | the shared packages — 3 organs, all finalized |
@@ -63,6 +66,9 @@ The standards point at real, running code so nobody builds from prose alone:
 - **Mnemosyne** (`automatons/Mnemosyne`) — the React reference for the automaton organs (Codex UI,
   sealed vault, on-box deploy). *(Mnemosyne predates this standard and still has drift — 3 widths, 2
   token sets — that it will align up to; treat Pythia as the clean `design/` reference.)*
+- **OuronetUI** (`OuroborosNetwork/daimons/OuronetUI`) — the reference for **[`mobile/`](./mobile)**:
+  the app-shell (fixed frame + bottom tab-bar + footer riser), the `SwipeDeck` primitive, and the
+  first fully mobile-converted page (the Dashboard, as fixed swipeable zones). v2.4.0 → **v2.8.0**.
 
 ## Theme-agnostic by construction
 

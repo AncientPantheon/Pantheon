@@ -2,6 +2,22 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-11 — new section `mobile/`: the Pantheonic Mobile UI standard (app-shell + fixed zones)
+
+Added [`mobile/`](./mobile) — how every Pantheon consumer UI becomes a phone app: a fixed native-app
+shell (pinned header + bottom tab bar, one scrolling content stage, no page scroll/zoom), fixed
+rectangle **zones** with scroll only *inside* an overflowing zone, and **discrete swipe** between
+rectangles (snap-per-swipe, no in-between). Documents the two things that cost us the most: (1) the
+**`min-h-0` flex-height chain** — miss it on one wrapper and every `h-full`/`flex-1` balloons to a
+giant content height (empty tails, off-screen buttons, page scroll); and (2) the **`SwipeDeck`**
+primitive (`scroll-snap-stop: always` + `min-w-0`/`min-h-0` panes; horizontal/vertical, `fill`,
+`peek`, `initialIndex`). Plus the page-conversion recipe (branch on `useIsMobile()`, fixed zones,
+redesign dense — never `zoom`/`scale`), full-screen modals via one shared `<Modal>`, and the touch
+gotcha (Radix flash-close on quick tap → `touchend` preventDefault to kill ghost events). Reference
+impl: **OuronetUI v2.4.0 → v2.8.0** (app-shell in `main-layout.tsx`, `SwipeDeck.tsx`, Dashboard in
+`dashboard.tsx` + `DashboardInfoHeader`/`AccountCards`/`overview.tsx`). Chrome is standardized; page
+conversion is in progress (Dashboard is the first reference; other pages/daimons follow §4).
+
 ## 2026-08-10 — `automaton/05` §5: deploy progress is now a per-phase STEP LIST (supersedes chip · Step N/M · pacman)
 
 Rewrote §5 (the client progress display) for the cleaner step-list model StoaExplorer proved out and
