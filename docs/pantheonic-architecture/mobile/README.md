@@ -122,7 +122,14 @@ is tracked from scroll position.
 
 **Put controls BELOW the deck, never overlaying it.** Side-anchored (`absolute left/right`) arrows sit
 on top of the pane and obscure the data underneath — put the ‹ › arrows in a row with the dots *below*
-the deck instead.
+the deck instead. But note the controls row then *costs vertical height* — budget for it, or a
+neighbouring fixed-height zone will start clipping (see §4).
+
+**A vertical snap-deck of cards taller than one pane must let panes scroll.** A tall card (e.g. a
+token with balance rows + action buttons) won't fit one screen; with `scroll-snap-type: y mandatory`
++ `overflow: hidden` panes it gets cut off. Use **`y proximity`** snap and **`overflow-y: auto` on the
+pane** so a tall card scrolls to reveal itself, then the next pane snaps in; a short card still fills
+the pane.
 
 *Reference:* `src/components/ui/SwipeDeck.tsx`.
 
@@ -149,6 +156,13 @@ the deck instead.
    `MiddleFit` in `overview.tsx` — Stoa account one line, Ouronet account filling the leftover area.)*
 5. **Verify the `min-h-0` chain** (§2) end-to-end, then test on a real device: no page scroll, no
    pinch-zoom, each pane fits, swipes are discrete.
+
+**Clipping caveat:** `overflow: hidden` on a fixed zone whose content might exceed it **silently loses
+content** (an address collapses to nothing, a button gets cut in half). Only use `overflow: hidden`
+where you can *guarantee* the fit (e.g. a pane sized to one screen on the swipe axis); everywhere a
+detail zone could outgrow its box, give it **`overflow-y: auto` as a safety** so it scrolls instead of
+clipping, and floor collapsible children with a `min-height`. Test the *smallest* real screen and the
+*fullest* real account — dead space and clipping both only show at the extremes.
 
 *Reference:* `src/routes/logged-in/dashboard.tsx` (fixed zones),
 `src/components/dashboard/DashboardInfoHeader.tsx` (horizontal deck, opens on the last panel),
