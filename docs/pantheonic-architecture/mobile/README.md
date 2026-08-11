@@ -134,8 +134,12 @@ is tracked from scroll position.
    zone and a swipe replaces it entirely. Use a **vertical** `SwipeDeck` when a zone holds a list of
    equal panes to page through (Dashboard Primordials = 8 token panes, vertical, dots on the right).
 4. **Redesign heavy components dense** so they fit their zone: compact stat chips instead of tall
-   boxes, wrap long strings to use available width, essentials fixed at the top and only the
-   *detail* (e.g. addresses) scrolling inside the card. **No `zoom`/`transform: scale`.**
+   boxes, essentials fixed at the top, and — the preferred way to handle long unbreakable strings —
+   **middle-truncate them to fill the space (`head…tail`) instead of scrolling.** Wrapping a long
+   string wastes a whole line for one trailing character and reintroduces scroll; measure the box and
+   shorten in the *middle* to fit exactly (one line, or filling a `flex-1` remainder). Keep the full
+   value on **copy** and in `title`. **No `zoom`/`transform: scale`.** *(Reference: `MiddleFit` in
+   `overview.tsx` — Stoa account on one line, Ouronet account filling the leftover area.)*
 5. **Verify the `min-h-0` chain** (§2) end-to-end, then test on a real device: no page scroll, no
    pinch-zoom, each pane fits, swipes are discrete.
 
