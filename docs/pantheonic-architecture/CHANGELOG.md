@@ -2,6 +2,15 @@
 
 Human-readable log of what the library gains or changes, on top of git history. Newest first.
 
+## 2026-08-11 — `mobile/` refinements: measured string-fit + content-height modals
+
+Two lessons from OuronetUI v2.8.1→2.8.3 folded into `mobile/`: (1) **§4 middle-truncation must MEASURE
+the real fit** — binary-search an off-screen measurer with the same typography + wrap width for the
+longest `head…tail` that fits; do NOT estimate from average char width (over-truncates on mixed/astral
+glyphs, leaving half-empty lines). (2) **§5 mobile modals are content-height capped at `100dvh`**, not
+forced `height: 100dvh` — a fixed full height leaves dead space below a short modal (its own bg filling
+the screen). Short modal = content-tall; tall modal = fills + scrolls.
+
 ## 2026-08-11 — new section `mobile/`: the Pantheonic Mobile UI standard (app-shell + fixed zones)
 
 Added [`mobile/`](./mobile) — how every Pantheon consumer UI becomes a phone app: a fixed native-app

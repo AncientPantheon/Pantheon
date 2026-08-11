@@ -134,12 +134,15 @@ is tracked from scroll position.
    zone and a swipe replaces it entirely. Use a **vertical** `SwipeDeck` when a zone holds a list of
    equal panes to page through (Dashboard Primordials = 8 token panes, vertical, dots on the right).
 4. **Redesign heavy components dense** so they fit their zone: compact stat chips instead of tall
-   boxes, essentials fixed at the top, and — the preferred way to handle long unbreakable strings —
-   **middle-truncate them to fill the space (`head…tail`) instead of scrolling.** Wrapping a long
-   string wastes a whole line for one trailing character and reintroduces scroll; measure the box and
-   shorten in the *middle* to fit exactly (one line, or filling a `flex-1` remainder). Keep the full
-   value on **copy** and in `title`. **No `zoom`/`transform: scale`.** *(Reference: `MiddleFit` in
-   `overview.tsx` — Stoa account on one line, Ouronet account filling the leftover area.)*
+   boxes, essentials fixed at the top, and — the preferred way to handle long unbreakable strings
+   (addresses, hashes) — **middle-truncate them to fill the space (`head…tail`) instead of
+   scrolling.** Wrapping a long string wastes a whole line for one trailing character and reintroduces
+   scroll; shorten in the *middle* to fit exactly (one line, or filling a `flex-1` remainder), keeping
+   the full value on **copy** and in `title`. **Measure the ACTUAL rendered fit** — binary-search an
+   off-screen measurer with the same typography + wrap width for the longest truncation that fits. Do
+   **not** estimate from an average character width: it's unreliable for mixed / emoji / astral-plane
+   glyphs and over-truncates, leaving half-empty lines. **No `zoom`/`transform: scale`.** *(Reference:
+   `MiddleFit` in `overview.tsx` — Stoa account one line, Ouronet account filling the leftover area.)*
 5. **Verify the `min-h-0` chain** (§2) end-to-end, then test on a real device: no page scroll, no
    pinch-zoom, each pane fits, swipes are discrete.
 
@@ -152,11 +155,15 @@ is tracked from scroll position.
 
 ## 5. Modals / signing zones (ZBOMs) go full-screen on mobile
 
-Every transaction/confirm popup opens as a **full-screen immersive sheet** on phones — one change to
-the **shared modal component** flips *all* of them at once (in OuronetUI, all 47 CFM/ZBOM modals go
-through one `<Modal>`). At `≤ 1023.98px`: the dialog fills the viewport (covers the tab bar for a
-focused signing task), the body scrolls internally, and the ✕ is pinned. Do the heavy lifting in CSS
-with `!important` at the mobile breakpoint; keep the component's inline styles in agreement.
+Every transaction/confirm popup opens as an **immersive sheet** on phones — one change to the
+**shared modal component** flips *all* of them at once (in OuronetUI, all 47 CFM/ZBOM modals go
+through one `<Modal>`). At `≤ 1023.98px` the sheet is **full-width, content-height, capped at
+`max-height: 100dvh`** (covering the tab bar, ✕ pinned): a **short** modal is only as tall as its
+content, a **tall** one fills the screen and scrolls the body. **Do not force `height: 100dvh`** — a
+fixed full height leaves dead space below a short modal (the modal's own background filling the screen
+under the content). Do the heavy lifting in CSS with `!important` at the mobile breakpoint (`height:
+auto; min-height: 0; max-height: 100dvh; overflow-y: auto`); keep the component's inline styles in
+agreement (no forced min-height).
 
 *Reference:* `src/assets/styles/components/_dialog.css` (mobile full-screen block),
 `src/components/ui/Modal/Modal.tsx`.
