@@ -167,10 +167,24 @@ content, a **tall** one fills the screen and scrolls the body. **Do not force `h
 fixed full height leaves dead space below a short modal (the modal's own background filling the screen
 under the content). Do the heavy lifting in CSS with `!important` at the mobile breakpoint (`height:
 auto; min-height: 0; max-height: 100dvh; overflow-y: auto`); keep the component's inline styles in
-agreement (no forced min-height). **Gotcha (react-modal):** the content element keeps a default
-`bottom: 40px`, which — even with `height: auto` — stretches the sheet to nearly full height and
-recreates the dead space. **Top-anchor it explicitly** (`position: fixed; inset: 0 0 auto 0`) so
-`bottom` resolves to `auto` and the sheet is genuinely content-tall.
+agreement (no forced min-height).
+
+Two gotchas that will make the sheet *look* unfixable until you find them:
+- **react-modal keeps a default `bottom: 40px`** on the content element, which — even with `height:
+  auto` — stretches the sheet to nearly full height and recreates the dead space. **Top-anchor it
+  explicitly** (`position: fixed; inset: 0 0 auto 0`) so `bottom` resolves to `auto`.
+- **A component-level height cap inside the modal overrides everything.** The shared modal-body
+  component (OuronetUI's `ZbomLayout`) hard-capped itself at `max-height: 82vh` for the desktop
+  centred-sheet look — so on mobile *every* modal was ~82vh tall no matter the sheet CSS, and the
+  ~18vh "gap" was just the backdrop below it. **Lift inner caps on mobile** (`82vh →
+  calc(100dvh - <sheet padding>)`) so the body can grow to the full sheet; its own internal scroller
+  then scrolls the long content. When chasing modal dead-space, **check the modal body's own
+  `max-height`, not just the dialog CSS.**
+
+Finally, **give the content-height sheet a visible lower delimiter** (a bordered / rounded bottom
+edge). Card background and backdrop are both near-black, so without a delimiter the card's end reads
+as an unexplained void; a thin border makes "the card ends here, growing down as content expands"
+obvious.
 
 *Reference:* `src/assets/styles/components/_dialog.css` (mobile full-screen block),
 `src/components/ui/Modal/Modal.tsx`.
