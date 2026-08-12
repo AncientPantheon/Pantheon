@@ -154,15 +154,27 @@ to cover the slot height:
   `data-ghostable` region + a `useGhosted()` context tell the card to hide them) and re-fit the DATA
   alone. **Ghosting is the LAST resort** — buttons show whenever they fit.
 
-Two hard-won correctness rules:
+Three hard-won correctness rules — all about the coupling between `scale` and `width`:
 
-- **Width-compensated 2-pass measure.** Scaling up while `width:100%` would overflow the width; instead
-  set `width = 100/scale%` and re-measure the *reflowed* height, so the card covers **both** dimensions.
-- **A final verify-and-shrink guard is mandatory.** Estimate-based passes **overshoot when text
-  rewraps** and the `overflow-hidden` then shaves the card's bottom border/last row. After computing the
-  scale, **apply it, measure the actually-rendered `getBoundingClientRect().height`, and shrink in small
-  steps until it truly fits.** This is a guarantee, not a margin. (Symptom without it: "the lowest frame
-  of the card is cut off." A fixed `-2px` inset is *not* enough.)
+- **`width = 100/scale%` is the fill invariant.** A card at `width: 100%` can't scale up without
+  overflowing horizontally; instead set the CSS width to `100/scale%` so the *post-scale* width lands
+  back at exactly the slot width. This one relationship fills the width **at any scale** — and it must
+  hold for the **final** scale, not an intermediate one.
+- **Converge — don't single-pass.** The content **reflows** (long strings rewrap) as the width changes,
+  so `scale` and `width` are mutually dependent. Iterate: set `width = 100/scale%`, measure the reflowed
+  height `h`, set `scale = H/h`, repeat until it settles (~6 iterations). A single width-compensated pass
+  mis-measures.
+- **A verify-and-shrink safety, with width kept IN SYNC.** After converging, apply the transform and
+  measure the actually-rendered `getBoundingClientRect().height`; if a residual overshoot remains (e.g. a
+  `maxScale` cap), shrink in small steps — **and recompute `width = 100/scale%` on every step** so the
+  card keeps filling the width as it shrinks. This is a guarantee, not a margin.
+
+  > Two real bugs, same root cause — width left tracking a stale scale:
+  > - **"the lowest frame of the card is cut off"** = the scale overshot (reflow) and `overflow-hidden`
+  >   shaved the bottom border. A fixed `-2px` inset is *not* enough; you need the measured shrink.
+  > - **"the card doesn't span the full width"** = the shrink guard reduced `scale` but the width was
+  >   still computed from the pre-shrink scale, so the post-scale width undershot the slot. Recompute
+  >   width from the final scale.
 
 Measure the ghostable region's natural height via `scrollHeight` **even while it's collapsed**, so the
 show/ghost decision doesn't flicker.
