@@ -170,8 +170,11 @@ Three hard-won correctness rules — all about the coupling between `scale` and 
   card keeps filling the width as it shrinks. This is a guarantee, not a margin.
 
   > Two real bugs, same root cause — width left tracking a stale scale:
-  > - **"the lowest frame of the card is cut off"** = the scale overshot (reflow) and `overflow-hidden`
-  >   shaved the bottom border. A fixed `-2px` inset is *not* enough; you need the measured shrink.
+  > - **"the lowest frame of the card is cut off"** = either the scale overshot (reflow), OR the card
+  >   filled to *exactly* the box height so subpixel rounding of the scaled height sat the border on the
+  >   `overflow-hidden` clip edge. Fill to a **comfortable measured clearance** (`box − ~6px`, verified
+  >   against `getBoundingClientRect`) — a flat `-2px` inset is *not* enough. Because width tracks
+  >   `100/scale%`, this vertical clearance costs **no** horizontal space.
   > - **"the card doesn't span the full width"** = the shrink guard reduced `scale` but the width was
   >   still computed from the pre-shrink scale, so the post-scale width undershot the slot. Recompute
   >   width from the final scale.
