@@ -179,6 +179,14 @@ Three hard-won correctness rules — all about the coupling between `scale` and 
   >   still computed from the pre-shrink scale, so the post-scale width undershot the slot. Recompute
   >   width from the final scale.
 
+**Re-measure until it settles — the first measure lies.** The initial layout runs before the dynamic
+viewport (`dvh`) height and web fonts have settled, so a first-paint measure **over-estimates the slot,
+over-scales, and clips** — and nothing re-fires until a resize. The tell is unmistakable: *"on this
+device the frame is missing, but switch to another device and back and it's fine."* That's a stale
+first measure, not a math bug. Re-fit on a `requestAnimationFrame`, on a few **staggered timeouts**
+(~60 / 200 / 500 / 1000 ms), on **`document.fonts.ready`**, and via a `ResizeObserver` on the slot.
+It's cheap insurance; without it the fit is a coin-flip on first load.
+
 Measure the ghostable region's natural height via `scrollHeight` **even while it's collapsed**, so the
 show/ghost decision doesn't flicker.
 
