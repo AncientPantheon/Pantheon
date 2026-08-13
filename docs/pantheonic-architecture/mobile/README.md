@@ -357,9 +357,11 @@ A page is "Pantheonic-mobile" when, on a phone **and** a tablet **and** iPad Pro
 
 - **Chrome (header + bottom tab bar): standardized** — the shared mobile shell every Pantheon site
   reuses (only the theme changes).
-- **Adaptive-fit engine: proven (v2.9.0)** — `AdaptiveFit`/`AdaptiveDeck` fill the **Dashboard**
-  deterministically across S8+ (360px), phones, tablets, and iPad Pro (1024px). This is the pattern to
-  copy for every other page and daimon.
+- **Adaptive-fit engine: proven on real devices (v2.9.0)** — `AdaptiveFit`/`AdaptiveDeck` fill the
+  **Dashboard** deterministically and **correctly on first paint** (no clip, no narrowing, no wasted
+  space) across S8+ (360px), iPhone 12 / 14 Pro Max, ZenBook Fold, tablets, and iPad Pro (1024px). This
+  is the pattern to copy for every other page and daimon. The three coupled constraints — fill width,
+  fill height, never clip — plus the "first measure lies" timing trap are the whole game; §4 has them.
 - **Page conversion: ongoing** — the Dashboard is the fully-converted reference. Every other page (and
   daimon: Mnemosyne, Explorer, …) converts by following §6 against the same shell + engine. This folder
   grows as more page patterns are proven.
